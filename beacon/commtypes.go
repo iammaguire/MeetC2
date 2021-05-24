@@ -12,6 +12,7 @@ type BeaconIPID struct {
 type CommandResponse struct {
 	Exec []string
 	Download []string
+	Upload []string
 }
 
 type CommandUpdate struct {

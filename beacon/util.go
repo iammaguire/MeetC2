@@ -8,6 +8,12 @@ import (
 	"math/rand"
 )
 
+var writeCheckLocations = []string {
+	"/dev/shm",
+	"/tmp",
+	"/opt",
+}
+
 func debugFatal(err error) {
 	if err != nil && debug {
 		log.Fatal(err)

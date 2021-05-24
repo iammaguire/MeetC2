@@ -11,6 +11,7 @@ type Request interface {
 	queryServer()
     handleQueryResponse(CommandResponse)
     upload(string)
+    download(string)
 }
 
 type CommType interface {

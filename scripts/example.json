@@ -1,0 +1,13 @@
+{
+    "beacon": {
+        "update": 100
+    },
+
+    "target": {
+        "ip": "127.0.0.1",
+        "proto": "http",
+        "username": "meet",
+        "password": "-",
+        "trigger": "ABCDEF"
+    }
+}

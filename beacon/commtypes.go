@@ -5,7 +5,7 @@ type BeaconHttp struct {
 	data []byte
 }
 
-type Base64Encoder struct {
+type BeaconIPID struct {
 	data []byte
 }
 

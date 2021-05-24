@@ -20,10 +20,14 @@ Downloaded files will be saved to downloads/BEACON-IP/BEACON-ID/
 
 Todo list:
 - Add communication over DNS, HTTPS, ICMP etc
+- Exec:
+    - HTTP: finished
 - Upload
-- Download: PARTIALLY FINISHED
+- Download: 
+    - HTTP: finished
 - Proxychaining beacons OR P2P beacons
 - Automatic proxychains configuration depending on beacon route
 - Add handling of multiple clients with random unique IDs: FINISHED
 - RSA encrypt data instead of base 64
+- Randomly timed sending of fragments
 - Web interface

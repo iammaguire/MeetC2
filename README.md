@@ -1,4 +1,7 @@
 ![c2 image](https://i.imgur.com/x6sQ3Dd.png)
+<br />
+![web image](https://i.imgur.com/GClimue.png)
+
 
 Usage:
 
@@ -44,4 +47,4 @@ Todo list:
 - Add handling of multiple clients with random unique IDs: FINISHED
 - RSA encrypt data instead of base 64
 - Randomly timed sending of fragments
-- Web interface
+- Web interface - WIP

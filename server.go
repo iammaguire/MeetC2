@@ -254,6 +254,10 @@ func processInput(input string) {
 				fmt.Println("usage: " + cmdArgs["create"])
 				return
 			}
+			if len(listeners) <= l || l < 0 {
+				fmt.Println("Listener " + cmd[1] + " does not exist, list existing listeners with 'listeners'")
+				return
+			}
 			createBeacon(l)
 		case "list":
 			listBeacons()
@@ -304,14 +308,22 @@ func handleInput() {
 }
 
 func main() {
-	
+	var WebInterface = WebInterface {
+		port: 8000,
+	}
+
+	var err = WebInterface.startListener()
+	if err != nil {
+		fmt.Println("Failed to start web interface.")
+	}
+
 	var HttpListener = HttpListener {
 		iface: "tun0",
 		hostname: "command.com",
 		port: 8001,
 	}
 
-	var err = HttpListener.startListener()
+	err = HttpListener.startListener()
 	if err != nil {
 		fmt.Println("Failed to start http server.")
 	}

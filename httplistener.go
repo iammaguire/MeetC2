@@ -34,14 +34,9 @@ type HttpListener struct {
 	port int
 }
 
-func (server HttpListener) webInterfaceHandler(w http.ResponseWriter, h *http.Request) {
-	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
-}
-
 func (server HttpListener) startListener() (error) {
 	var router = mux.NewRouter()
 	var ifaceIp = getIfaceIp(server.iface)
-	router.HandleFunc("/", server.webInterfaceHandler).Host(ifaceIp)
 	router.HandleFunc("/{data}", server.beaconPostHandler).Host(server.hostname).Methods("Post")
 	router.HandleFunc("/{data}", server.beaconGetHandler).Host(server.hostname).Methods("Get")
 	router.HandleFunc("/d/{data}", server.beaconUploadHandler).Host(server.hostname).Methods("Get")

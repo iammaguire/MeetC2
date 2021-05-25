@@ -8,7 +8,7 @@ import (
 
 const idBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-var msPerUpdate int = 500
+var msPerUpdate int = 5000
 var idLen int = 8
 var cmdAddress string
 var cmdPort string

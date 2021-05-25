@@ -20,16 +20,16 @@ Downloaded files will be saved to downloads/BEACON-IP/BEACON-ID/
 
 Commands:
 
-create &lt;listener&gt;
-download &lt;beacon id OR index&gt; &lt;remote file&gt; OR &lt;remote file&gt;
-upload &lt;beacon id OR index&gt; &lt;local file&gt; OR &lt;local file&gt;
-use &lt;beacon id OR index&gt;
-script &lt;beacon id OR index&gt; &lt;local file path&gt; &lt;remote executor path&gt;
-help &lt;command&gt;
-listeners 
-exec &lt;beacon id OR index&gt; &lt;command&gt;
-list 
-httplistener &lt;iface&gt; &lt;hostname&gt; &lt;port&gt;
+create &lt;listener&gt;<br />
+download &lt;beacon id OR index&gt; &lt;remote file&gt; OR &lt;remote file&gt;<br />
+upload &lt;beacon id OR index&gt; &lt;local file&gt; OR &lt;local file&gt;<br />
+use &lt;beacon id OR index&gt;<br />
+script &lt;beacon id OR index&gt; &lt;local file path&gt; &lt;remote executor path&gt;<br />
+help &lt;command&gt;<br />
+listeners <br />
+exec &lt;beacon id OR index&gt; &lt;command&gt;<br />
+list <br />
+httplistener &lt;iface&gt; &lt;hostname&gt; &lt;port&gt;<br />
 
 Todo list:
 - Add communication over DNS, HTTPS, ICMP etc

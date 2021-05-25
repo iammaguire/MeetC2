@@ -36,6 +36,7 @@ Todo list:
 - Exec:
     - HTTP: finished
 - Upload
+    - HTTP: finished
 - Download: 
     - HTTP: finished
 - Proxychaining beacons OR P2P beacons

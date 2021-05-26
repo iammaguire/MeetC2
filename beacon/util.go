@@ -3,9 +3,7 @@ package main
 import (
 	"log"
 	"net"
-	"time"
 	"errors"
-	"math/rand"
 )
 
 var writeCheckLocations = []string {
@@ -58,15 +56,4 @@ func externalIP() (string, error) {
 	}
 
 	return "", errors.New("not connected")
-}
-
-func genRandID() string {
-	rand.Seed(time.Now().UTC().UnixNano())
-    b := make([]byte, idLen)
-    
-	for i := range b {
-        b[i] = idBytes[rand.Intn(len(idBytes))]
-    }
-    
-	return string(b)
 }

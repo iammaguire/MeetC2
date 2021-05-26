@@ -11,6 +11,7 @@ import (
 type IWebInterface interface {
 	startListener() (error)
 	beaconsHandler(http.ResponseWriter, *http.Request)
+	listenersHandler(http.ResponseWriter, *http.Request)
 }
 
 type WebInterface struct {
@@ -20,6 +21,8 @@ type WebInterface struct {
 func (server WebInterface) startListener() (error) {
 	var router = mux.NewRouter()
 	router.HandleFunc("/api/beacons", server.beaconsHandler).Methods("Get")
+	router.HandleFunc("/api/listeners", server.listenersHandler).Methods("Get")
+
 	staticFileDirectory := http.Dir("./www/")
 	staticFileHandler := http.StripPrefix("/c2/", http.FileServer(staticFileDirectory))
 	router.PathPrefix("/c2/").Handler(staticFileHandler).Methods("GET")

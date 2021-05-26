@@ -12,6 +12,7 @@ type Request interface {
     handleQueryResponse(CommandResponse)
     upload(string)
     download(string)
+    addProxyClient(Beacon)
 }
 
 type CommType interface {

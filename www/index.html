@@ -25,19 +25,19 @@
                 <div class="sidebar-sticky">
                     <ul class="nav flex-column">
                         <li class="nav-item">
-                            <a class="nav-link active" href="#">
+                            <a class="nav-link active tablinks" href="javascript:void(0);" onclick="ShowView(event, 'dashboard')">
                                 <span data-feather="home"></span>
                                 Dashboard <span class="sr-only">(current)</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">
+                            <a class="nav-link tablinks" href="javascript:void(0);" onclick="ShowView(event, 'beacons')">
                                 <span data-feather="users"></span>
                                 Beacons
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">
+                            <a class="nav-link tablinks" href="javascript:void(0);" onclick="ShowView(event, 'listeners')">
                                 <span data-feather="layers"></span>
                                 Listeners
                             </a>
@@ -61,41 +61,89 @@
                 </div>
             </nav>
 
-            <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Dashboard</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="btn-group mr-2">
-                            <button class="btn btn-sm btn-outline-secondary">Share</button>
-                            <button class="btn btn-sm btn-outline-secondary">Export</button>
+            <div class="tabcontent" id="dashboard">
+                <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
+                    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                        <h1 class="h2">Dashboard</h1>
+                        <div class="btn-toolbar mb-2 mb-md-0">
+                            <div class="btn-group mr-2">
+                                <button class="btn btn-sm btn-outline-secondary">Share</button>
+                                <button class="btn btn-sm btn-outline-secondary">Export</button>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle">
+                                <span data-feather="calendar"></span>
+                                This week
+                            </button>
                         </div>
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle">
-                            <span data-feather="calendar"></span>
-                            This week
-                        </button>
                     </div>
-                </div>
 
-                <h2>Beacons</h2>
-                <div class="table-responsive" id="beacon-table">
-                  <table class="table table-striped table-sm">
-                    <thead>
-                      <tr>
-                        <th>IP</th>
-                        <th>ID</th>
-                        <th>Last Seen</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>10.10.14.12</td>
-                        <td>dJu7wG</td>
-                        <td>2 minutes ago</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-            </main>
+                    <h2>Welcome</h2>
+                </main>
+            </div>
+            <div class="tabcontent" id="beacons">
+                <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
+                    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                        <h1 class="h2">Beacons</h1>
+                        <div class="btn-toolbar mb-2 mb-md-0">
+                            <div class="btn-group mr-2">
+                                <button class="btn btn-sm btn-outline-secondary">Share</button>
+                                <button class="btn btn-sm btn-outline-secondary">Export</button>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle">
+                                <span data-feather="calendar"></span>
+                                This week
+                            </button>
+                        </div>
+                    </div>
+
+                    <h2>Active</h2>
+                    <div class="table-responsive" id="beacon-table">
+                        <table class="table table-striped table-sm">
+                            <thead>
+                                <tr>
+                                    <th>IP</th>
+                                    <th>ID</th>
+                                    <th>Last Seen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+                </main>
+            </div>
+            <div class="tabcontent" id="listeners">
+                <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
+                    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                        <h1 class="h2">Listeners</h1>
+                        <div class="btn-toolbar mb-2 mb-md-0">
+                            <div class="btn-group mr-2">
+                                <button class="btn btn-sm btn-outline-secondary">Share</button>
+                                <button class="btn btn-sm btn-outline-secondary">Export</button>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle">
+                                <span data-feather="calendar"></span>
+                                This week
+                            </button>
+                        </div>
+                    </div>
+
+                    <h2>Active</h2>
+                    <div class="table-responsive" id="listener-table">
+                        <table class="table table-striped table-sm">
+                            <thead>
+                                <tr>
+                                    <th>IP</th>
+                                    <th>ID</th>
+                                    <th>Last Seen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+                </main>
+            </div>
         </div>
     </div>
 

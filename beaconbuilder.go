@@ -133,7 +133,7 @@ func createBeacon(listener int) {
 	fmt.Println("Saved beacon for listener " + getIfaceIp(listeners[listener].Iface) + ":" + strconv.Itoa(listeners[listener].Port) + "%" + listeners[listener].Iface + " to out/" + beaconName)
 	
 	if target == "windows" {
-		out, _ := exec.Command("/bin/sh", "-c", "./utils/donut out/" + beaconName + " -o out/" + beaconName + ".bin").Output()
+		out, _ := exec.Command("/bin/sh", "-c", "./includes/donut out/" + beaconName + " -o out/" + beaconName + ".bin").Output()
 		fmt.Println(string(out))
 	}
 }

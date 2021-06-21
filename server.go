@@ -1,17 +1,17 @@
 package main
 
 import (
+	"os"
+	"net"
 	"fmt"
 	"time"
-	"net"
-	"encoding/json"
+	"bufio"
 	"strconv"
-	"os"
+	"strings"
 	"math/rand"
 	"io/ioutil"
+	"encoding/json"
 	"encoding/base64"
-	"strings"
-	"bufio"
 )
 
 type CommandUpdate struct {
@@ -105,14 +105,19 @@ func convertTime(t time.Duration) (string) {
 }
 
 func listBeacons() {
+	header := "#\tID\t\t\tUser\t\tIP\t\t\t\t\tProcess\t\tPlatform\tArch\tLast Seen\n" +
+				   "---------------------------------------------------------------------------------------------------------"
+	formatString := "%d\t%-12s\t%-15s\t%-15s\t%-15s\t%-8s\t%-5s\t%-15s\n"
+	
+	fmt.Println(header)
 	for i, b := range beacons {
 		diff := time.Now().Sub(b.LastSeen)
-		status := " last seen " + convertTime(diff) + " ago."
+		status := convertTime(diff)
 		if b.LastSeen.Year() == 1 {
 			status = " has not checked in yet."
 		}
 
-		fmt.Println("[" + strconv.Itoa(i) + "] {" + b.Id + "\\" + b.Pname + "} " + b.User + "@" + b.Ip + " " + b.Platform + "\\" + b.Arch + status)
+		fmt.Printf(formatString, i, b.Id, b.User, b.Ip, b.Pname, b.Platform, b.Arch, status)
 	}
 }
 

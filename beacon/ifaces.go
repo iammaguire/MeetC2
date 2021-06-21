@@ -22,5 +22,5 @@ type CommType interface {
 }
 
 type IShellcodeInjector interface {
-    inject()
+    inject() error
 }

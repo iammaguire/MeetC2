@@ -36,7 +36,7 @@ var ip string
 var pid string
 var pname string
 var queryData string
-var debug bool = false
+var debug bool = true
 var curUser string
 var platform string
 var arch string

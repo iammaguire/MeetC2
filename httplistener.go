@@ -171,6 +171,16 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 			fmt.Println("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " process list:")
 			data, _ := b64.StdEncoding.DecodeString(update.Data)
 			fmt.Println(string(data))
+		} else if update.Type == "migrate" {
+			fmt.Print("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " migrate: ")
+			data, _ := b64.StdEncoding.DecodeString(update.Data)
+			fmt.Print(string(data))
+
+			if string(data) == "Success" {
+				fmt.Println("! Beacon will exit - wait for callback from migrated process.")
+			} else {
+				fmt.Println()
+			}
 		}
 		prompt()
 	}

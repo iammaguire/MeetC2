@@ -1,4 +1,4 @@
-![c2 image](https://i.imgur.com/x6sQ3Dd.png)
+https://user-images.githubusercontent.com/7650862/122788869-4b9e4600-d2a6-11eb-98c7-b33f8b2706bc.mp4
 <br />
 ![web image](https://i.imgur.com/GClimue.png)
 
@@ -16,6 +16,8 @@ Execute commands or download files from beacons:
 exec BEACON cmd
 download BEACON file
 
+After selecting an active beacon with user shellcode may be injected into another process. List processes with plist and provide the shellcode command with the path to the data as well as the PID.
+
 However if you select a beacon with the use command you can exempt the beacon identification.
 Beacon identification can be replaced with * to schedule the operation for all live beacons.
 
@@ -23,19 +25,23 @@ Downloaded files will be saved to downloads/BEACON-IP/BEACON-ID/
 
 Commands:
 
-create &lt;listener&gt;<br />
-download &lt;beacon id OR index&gt; &lt;remote file&gt; OR &lt;remote file&gt;<br />
-upload &lt;beacon id OR index&gt; &lt;local file&gt; OR &lt;local file&gt;<br />
-use &lt;beacon id OR index&gt;<br />
-script &lt;beacon id OR index&gt; &lt;local file path&gt; &lt;remote executor path&gt;<br />
-help &lt;command&gt;<br />
-listeners <br />
-exec &lt;beacon id OR index&gt; &lt;command&gt;<br />
-list <br />
-httplistener &lt;iface&gt; &lt;hostname&gt; &lt;port&gt;<br />
+```
+listeners 
+httplistener <iface> <hostname> <port>
+exec <beacon id OR index> <command>
+upload <beacon id OR index> <local file> OR <local file>
+use <beacon id OR index>
+script <beacon id OR index> <local file path> <remote executor path>
+shellcode <path to shellcode> <PID>
+list 
+plist 
+create <listener>
+download <beacon id OR index> <remote file> OR <remote file>
+migrate <PID> // nonworking
+help <command>
+```
 
 Todo list:
-- Add communication over DNS, HTTPS, ICMP etc
 - Exec:
     - HTTP: finished
 - Upload
@@ -45,6 +51,6 @@ Todo list:
 - Proxychaining beacons OR P2P beacons
 - Automatic proxychains configuration depending on beacon route
 - Add handling of multiple clients with random unique IDs: FINISHED
-- RSA encrypt data instead of base 64
-- Randomly timed sending of fragments
+- RSA encrypt data instead of base 64 encode
+- Randomly timed sending
 - Web interface - WIP

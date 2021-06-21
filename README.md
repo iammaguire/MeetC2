@@ -42,7 +42,7 @@ list
 plist 
 create <listener>
 download <beacon id OR index> <remote file> OR <remote file>
-migrate <PID> // nonworking
+migrate <PID>
 help <command>
 ```
 
@@ -53,6 +53,12 @@ Todo list:
     - HTTP: finished
 - Download: 
     - HTTP: finished
+- Migration:
+    - Windows: finished
+    - Linux: WIP
+- Shellcode injection
+    - Windows: finished
+    - Linux: WIP
 - Proxychaining beacons OR P2P beacons
 - Automatic proxychains configuration depending on beacon route
 - Add handling of multiple clients with random unique IDs: FINISHED

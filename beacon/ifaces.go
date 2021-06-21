@@ -13,9 +13,14 @@ type Request interface {
     upload(string)
     download(string)
     addProxyClient(Beacon)
+    exitHandler()
 }
 
 type CommType interface {
     EncType
 	Request
+}
+
+type IShellcodeInjector interface {
+    inject()
 }

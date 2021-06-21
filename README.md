@@ -26,6 +26,8 @@ Beacon identification can be replaced with * to schedule the operation for all l
 
 Downloaded files will be saved to downloads/BEACON-IP/BEACON-ID/
 
+This project is in development with limited functionality.
+
 Commands:
 
 ```

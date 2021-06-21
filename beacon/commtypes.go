@@ -27,6 +27,7 @@ type CommandResponse struct {
 type CommandUpdate struct {
 	Ip string
 	Id string
+	User string
 	Platform string
 	Arch string
 	Type string

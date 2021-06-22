@@ -1,6 +1,4 @@
-
-
-https://user-images.githubusercontent.com/7650862/122814580-ef4a1f00-d2c3-11eb-8a8c-97af4b5cc3a0.mp4
+https://user-images.githubusercontent.com/7650862/122820505-35ef4780-d2cb-11eb-8c07-7021a916b20b.mp4
 
 <br />
 
@@ -9,21 +7,10 @@ https://user-images.githubusercontent.com/7650862/122814580-ef4a1f00-d2c3-11eb-8
 
 Usage:
 
-After cloning the repo run server.go
-Run 'create LHOST 8001' to generate a beacon. This will be placed in the out directory.
-Execute the beacon on the target.
-
 Inside the command server you can reference beacons using either their list id or their unique id.
 For example if the output of 'list' is '[0] LuTNluGL@10.255.52.1 last seen 2021-05-23 21:07:17.208101927 -0400 EDT m=+179.667762638', you could refer to this beacon by LuTNluGL or 0.
 
-Execute commands or download files from beacons:
-exec BEACON cmd
-download BEACON file
-
 After selecting an active beacon with user shellcode may be injected into another process. List processes with plist and provide the shellcode command with the path to the data as well as the PID.
-
-However if you select a beacon with the use command you can exempt the beacon identification.
-Beacon identification can be replaced with * to schedule the operation for all live beacons.
 
 Downloaded files will be saved to downloads/BEACON-IP/BEACON-ID/
 

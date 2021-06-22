@@ -3,6 +3,8 @@ package main
 import (
 	//"io/ioutil"
 	//"fmt"
+	"net"
+	"strings"
 	"net/http"
 	"encoding/json"
 	"github.com/gorilla/websocket"
@@ -49,4 +51,27 @@ func (server WebInterface) newBeaconHandler(w http.ResponseWriter, h *http.Reque
 	arch := h.URL.Query()["arch"][0]
 
 	processInput("create 0 " + platform + " " + arch)
+}
+
+func (server WebInterface) newHTTPListenerHandler(w http.ResponseWriter, h *http.Request) {
+	iface := h.URL.Query()["interface"][0]
+	hostname := h.URL.Query()["hostname"][0]
+	port := h.URL.Query()["port"][0]
+	
+	processInput("httplistener " + iface + " " + hostname + " " + port)
+}
+
+func (server WebInterface) netInterfacesHandler(w http.ResponseWriter, h *http.Request) {
+	var retIfaces []byte
+	ifaces, _ := net.Interfaces()
+	
+	for _, iface := range ifaces {
+		iname := iface.Name
+		addrs, _ := iface.Addrs()
+		if len(addrs) > 0 && addrs[0] != nil {
+			retIfaces = append(retIfaces, []byte(iname + " " + strings.Split(addrs[0].String(), "/")[0] + "\n")...)
+		}
+	}
+	
+	w.Write(retIfaces)
 }

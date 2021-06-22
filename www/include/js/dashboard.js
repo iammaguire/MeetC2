@@ -1,4 +1,5 @@
 var beacons = new Array();
+var listeners = new Array();
 var terminals = new Array();
 
 var intervalId = window.setInterval(function () {
@@ -9,17 +10,22 @@ var intervalId = window.setInterval(function () {
             jsonToTable(d, "#beacon-table")
         },
         error: function (jqXHR, textStatus, errorThrown) {
-            console.log(jqXHR)
+            //console.log(jqXHR)
         },
     });
     $.ajax({
         type: "GET",
         url: "http://127.0.0.1:8000/api/listeners",
         success: function (d) {
+            listeners = new Array();
+            data = JSON.parse(d)
+            for (i = 0; i < data.length; i++) {
+                listeners.push(data[i])
+            }
             jsonToTable(d, "#listener-table")
         },
         error: function (jqXHR, textStatus, errorThrown) {
-            console.log(jqXHR)
+            //console.log(jqXHR)
         },
     });
     $.ajax({
@@ -32,18 +38,38 @@ var intervalId = window.setInterval(function () {
             }
         },
         error: function (jqXHR, textStatus, errorThrown) {
-            console.log(jqXHR)
+            //console.log(jqXHR)
         },
     });
 }, 1000);
 
 $(document).ready(function() {    
-    $('#newBeaconBtn').click(function(){ $("#newBeaconModal").modal('show'); }) 
+    $('#newBeaconBtn').click(function() { $("#newBeaconModal").modal('show'); }) 
+    $('#newHTTPListenerBtn').click(function() { 
+        $.ajax({
+            type: "GET",
+            url: "http://127.0.0.1:8000/api/netifaces",
+            success: function (d) {
+                data = d.split(/\n/)
+                $('#listenerInterface').empty()
+                for (i = 0; i < data.length; i++) {
+                    if (data[i].length > 0) {
+                        $('#listenerInterface').append("<option>" + data[i] + "</data>")
+                    }
+                }
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+                console.log(jqXHR)
+            },
+        });
+
+        $("#newHTTPListenerModal").modal('show'); 
+    }) 
+    
     var beaconElement = $('#mainTerminal')   
-    addTerminal(beaconElement, null, "")  
     beaconElement.terminal(function(command) {
         let terminal = this
-        addTerminal(this, null, command)  
+        addTerminal(terminal, null, command)  
         try { terminal.socket.send("main::" + command) } catch(error) { console.log(error) }
     }.bind(this), {
         greetings: '',
@@ -51,6 +77,7 @@ $(document).ready(function() {
         height: 700,
         prompt: 'meetC2> ',
     })
+    addTerminal(beaconElement, null, "")  
     ShowView(null, 'dashboard');
 });
 
@@ -61,7 +88,7 @@ function newBeacon() {
 $('#beaconForm').submit(function(e){
     e.preventDefault();
     $.ajax({
-        url: '/api/new',
+        url: '/api/newbeacon',
         type: 'get',
         data: {platform: $('#beaconPlatform').val(), arch: $('#beaconArch').val()},
         success:function(){
@@ -70,6 +97,38 @@ $('#beaconForm').submit(function(e){
         }
     });
 });
+
+$('#httpListenerForm').submit(function(e) {
+    e.preventDefault();
+
+    if (!/^-?\d+$/.test($('#listenerPort').val())) {
+        $.notify("Enter number for port")
+        return
+    }
+
+    if (parseInt($('#listenerPort').val()) < 1 || parseInt($('#listenerPort').val()) > 65535) {
+        $.notify("Port not in range 1-65535", "error")
+        return
+    }
+
+    for (i = 0; i < listeners.length; i++) {
+        if (listeners[i].Port == $('#listenerPort').val()) {
+            $.notify("Port already in use", "error");
+            return
+        }
+    }
+
+    $.ajax({
+        url: '/api/newhttplistener',
+        type: 'get',
+        data: {interface: $('#listenerInterface').val().split(' ')[0], hostname: $('#listenerHostname').val(), port: $('#listenerPort').val()},
+        success:function(){
+            $("#newHTTPListenerModal").modal("hide");
+            ShowView(event, 'dashboard')
+        }
+    });
+});
+
 
 function jsonToTable(data, idName) {
     var data = JSON.parse(data)
@@ -145,21 +204,19 @@ function addTerminal(terminal, beacon, command) {
 
         socket.onmessage = event => {
             if (event.data.length > 0) {
-                terminal.echo(event.data)
-                terminal.echo('\r')
-             //   terminal.echo()
-//                console.log("'" + event.data + "'")
+                if (terminal.echo != null) {
+                    terminal.echo(event.data)
+                    terminal.echo('')
+                }
             }
         }
         terminal.socket = socket
-        console.log(terminal.socket, "list")
     }
 }
 
 function createBeaconTab(beacon) {
     var bTabDivs = document.getElementById("beaconTabDivs");
     var bTab = document.getElementById("beaconTabId");
-    console.log(bTab)
     bTab.innerHTML += '<button class="beaconTabButton" onclick="openBeaconTab(\'' + beacon.Id + '\')">' + beacon.Id + '</button>'
     bTabDivs.innerHTML += '<div id="' + beacon.Id + '" class="beaconTab console" style="display:none"></div>'
     jQuery(function($, undefined) {
@@ -191,5 +248,8 @@ function ShowView(evt, tabname) {
     }
 
     document.getElementById(tabname).style.display = "block";
-    evt.currentTarget.className += " active";
+    
+    if (evt != null) {
+        evt.currentTarget.className += " active";
+    }
 }

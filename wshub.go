@@ -1,9 +1,13 @@
 package main
 
 import (
+	//"os"
+	"fmt"
 	"time"
 	"strings"
 )
+
+var terminalPipe chan string = make(chan string)
 
 type Hub struct {
 	clients map[*Client]bool
@@ -22,6 +26,15 @@ func newHub() *Hub {
 }
 
 func (h *Hub) run() {
+	go func() {
+		for {
+			for client := range h.clients {
+				client.send <- []byte{}
+				time.Sleep(time.Millisecond * 100)
+			}
+		}
+	}()
+	
 	for {
 		select {
 		case client := <-h.register:
@@ -32,20 +45,16 @@ func (h *Hub) run() {
 				close(client.send)
 			}
 		case message := <-h.broadcast:
-			for client := range h.clients {
-				select {
-				case client.send <- message:
-					if(strings.HasPrefix(string(message), "meet2c:")) {
-						client.beaconId = strings.Split(string(message), ":")[1]
-					}
-
-					processInput(string(message))
-					time.Sleep(time.Millisecond * 500)
-					client.send <- stdOutBuffer
-					stdOutBuffer = stdOutBuffer[:0]
-				default:
-					close(client.send)
-					delete(h.clients, client)
+			fmt.Println("MESSAGE " + string(message))
+			
+			if redirectStdIn {
+				terminalPipe <- strings.Join(strings.Split(string(message), ":")[2:], ":")
+			} else {
+				msgSplit := strings.Split(string(message), ":")
+				fmt.Println(msgSplit)
+				if msgSplit[0] == "beacon" { 
+					processInput("use " + string(msgSplit[1]))
+					processInput(strings.Join(msgSplit[2:], ":"))					
 				}
 			}
 		}

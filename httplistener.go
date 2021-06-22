@@ -4,7 +4,6 @@ import (
 	"io"
 	"os"
 	"log"
-	"fmt"
 	"time"
 	"mime"
 	"bytes"
@@ -61,7 +60,7 @@ func (server HttpListener) receiveFile(beacon *Beacon, w http.ResponseWriter, r 
     file, header, err := r.FormFile("file")
 	
 	if err != nil {
-        fmt.Println("Failed to receive file.")
+        info("Failed to receive file.")
 		return
     }
 
@@ -88,7 +87,7 @@ func (server HttpListener) saveBeaconFile(beacon *Beacon, data bytes.Buffer, nam
 
 	err := ioutil.WriteFile(path + "/" + name, data.Bytes(), 0644)
     if err != nil {
-		fmt.Println("Failed to save file.")
+		info("Failed to save file.")
 	}
 
 	cwd, err := os.Getwd()
@@ -97,11 +96,11 @@ func (server HttpListener) saveBeaconFile(beacon *Beacon, data bytes.Buffer, nam
 		log.Fatal(err)
 	}
 
-	fmt.Println("Saved " + name + " from " + beacon.Id + "@" + beacon.Ip + " to " + cwd + "/" + path + "/" + name)
+	info("Saved " + name + " from " + beacon.Id + "@" + beacon.Ip + " to " + cwd + "/" + path + "/" + name)
 }
 
 func (server HttpListener) beaconUploadHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Serving file to beacon.")
+	info("Serving file to beacon.")
 	file := mux.Vars(r)["data"]
 	plaintext, _ := b64.StdEncoding.DecodeString(file)
 	fullPath := string(plaintext)
@@ -143,14 +142,14 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 	if len(update.Data) > 0 {
 		if update.Type == "exec" {
 			out := strings.Replace(string(decodedData), "\n", "\n\t", -1)
-			fmt.Println("\n[+] Beacon " + update.Id + "@" + update.Ip + " " + update.Type + ":")
-			fmt.Println("\t" + out[:len(out)-1])
+			info("\n[+] Beacon " + update.Id + "@" + update.Ip + " " + update.Type + ":")
+			info("\t" + out[:len(out)-1])
 		} else if update.Type == "upload" {
 			if(decodedData[0] == '1') {
 				f := strings.Split(string(decodedData), ";")
-				fmt.Println("Uploaded file to " + beacon.Id + "@" + beacon.Ip + ":" + f[1])
+				info("Uploaded file to " + beacon.Id + "@" + beacon.Ip + ":" + f[1])
 			} else if(decodedData[0] == '0') {
-				fmt.Println("Failed to upload file to " + beacon.Id + "@" + beacon.Ip)
+				info("Failed to upload file to " + beacon.Id + "@" + beacon.Ip)
 			}
 		} else if update.Type == "quit" {
 			idx := -1
@@ -158,7 +157,7 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 				if beacon == beacons[i] {
 					idx = i
 					webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"Beacon Exit", beacon.Id + "@" + beacon.Ip})
-					fmt.Println("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " has exited")
+					info("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " has exited")
 					if activeBeacon == beacon {
 						activeBeacon = nil
 					}
@@ -169,19 +168,19 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 				beacons = append(beacons[:idx], beacons[idx+1:]...)
 			}
 		} else if update.Type == "plist" {
-			fmt.Println("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " process list:")
+			info("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " process list:")
 			data, _ := b64.StdEncoding.DecodeString(update.Data)
-			fmt.Println(string(data))
+			info(string(data))
 		} else if update.Type == "migrate" {
-			fmt.Print("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " migrate: ")
+			infof("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " migrate: ")
 			data, _ := b64.StdEncoding.DecodeString(update.Data)
-			fmt.Print(string(data))
+			infof(string(data))
 
 			if string(data) == "Success" {
 				webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"Migrate success", beacon.Id + "@" + beacon.Ip})
-				fmt.Println("! Beacon will exit - wait for callback from migrated process.")
+				info("! Beacon will exit - wait for callback from migrated process.")
 			} else {
-				fmt.Println()
+				info()
 			}
 		}
 		prompt()
@@ -197,7 +196,7 @@ func (server HttpListener) beaconPostHandler(w http.ResponseWriter, r *http.Requ
 	beacon := registerBeacon(update)
 
 	if update.Type == "upload" {
-		fmt.Println("Receiving " + update.Data + " from " + beacon.Id)
+		info("Receiving " + update.Data + " from " + beacon.Id)
 		server.receiveFile(beacon, w, r)
 	}
 }

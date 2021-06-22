@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	//"io/ioutil"
 	"net/http"
 	"encoding/json"
@@ -17,11 +16,12 @@ func (server WebInterface) wsHandler(hub *Hub, w http.ResponseWriter, r *http.Re
 	conn, err := upgrader.Upgrade(w, r, nil)
 
 	if err != nil {
-		fmt.Println(err)
+		info(err.Error())
 		return
 	}
-
-	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
+	
+	wsWriter = w
+	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 1024)}
 	client.hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in

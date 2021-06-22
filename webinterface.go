@@ -26,10 +26,13 @@ type WebUpdate struct {
 }
 
 var webInterfaceUpdates []*WebUpdate = make([]*WebUpdate, 0)
-var stdOutBuffer []byte
+var stdOutBuffer string
+var redirectStdIn bool = false
+var wsWriter http.ResponseWriter
+var hub *Hub
 
 func (server WebInterface) startListener() (error) {
-	hub := newHub()
+	hub = newHub()
 	go hub.run()
 
 	var router = mux.NewRouter()

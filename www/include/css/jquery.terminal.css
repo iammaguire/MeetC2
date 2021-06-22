@@ -729,8 +729,8 @@
      .terminal-output > :not(.raw) a,
      .terminal-output > :not(.raw) div,
      .terminal-output > :not(.raw) span[data-text]:not(.token):not(.inverted):not(.terminal-inverted):not(.cmd-inverted):not(.terminal-error):not(.emoji) {
-         background-color: var(--background, #000);
-         color: var(--color, #aaa);
+         background-color: var(--background, #222);
+         color: var(--color, #fff);
      }
      .terminal span[style*="--length"] {
          display: inline-block;
@@ -743,7 +743,7 @@
      .terminal-output > :not(.raw) a,
      .terminal-output > :not(.raw) div,
      .terminal-output > :not(.raw) span {
-         font-size: calc(var(--size, 1) * 12px);
+         font-size: calc(var(--size, 1) * 16px);
      }
      .cmd .emoji,
      .terminal-output .emoji {

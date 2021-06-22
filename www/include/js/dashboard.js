@@ -37,8 +37,38 @@ var intervalId = window.setInterval(function () {
     });
 }, 1000);
 
-$(document).ready(function() {
+$(document).ready(function() {    
+    $('#newBeaconBtn').click(function(){ $("#newBeaconModal").modal('show'); }) 
+    var beaconElement = $('#mainTerminal')   
+    addTerminal(beaconElement, null, "")  
+    beaconElement.terminal(function(command) {
+        let terminal = this
+        addTerminal(this, null, command)  
+        try { terminal.socket.send("main::" + command) } catch(error) { console.log(error) }
+    }.bind(this), {
+        greetings: '',
+        name: "main_term",
+        height: 700,
+        prompt: 'meetC2> ',
+    })
     ShowView(null, 'dashboard');
+});
+
+function newBeacon() {
+    console.log('new beacon!')
+}
+
+$('#beaconForm').submit(function(e){
+    e.preventDefault();
+    $.ajax({
+        url: '/api/new',
+        type: 'get',
+        data: {platform: $('#beaconPlatform').val(), arch: $('#beaconArch').val()},
+        success:function(){
+            $("#newBeaconModal").modal("hide");
+            ShowView(event, 'dashboard')
+        }
+    });
 });
 
 function jsonToTable(data, idName) {
@@ -84,7 +114,7 @@ function openBeaconTab(beaconId) {
     document.getElementById(beaconId).style.display = "block";
 }
 
-function addTerminal(terminal, beacon) {
+function addTerminal(terminal, beacon, command) {
     var found = false;
     for (i = 0; i < terminals.length; i++) {
         if (terminal === terminals[i]) {
@@ -95,10 +125,13 @@ function addTerminal(terminal, beacon) {
     if (!found) {
         terminals.push(terminal);
         var socket = new WebSocket("ws://127.0.0.1:8000/api/ws");
-        
+
         socket.onopen = () => {
-            console.log("Successfully Connected");
-            socket.send("meetc2:" + beacon.Id)
+            if (beacon == null) {
+                socket.send("main::" + command)
+            } else {
+                socket.send("beacon:" + beacon.Id + ":" + command)
+            }
         };
         
         socket.onclose = event => {
@@ -113,12 +146,13 @@ function addTerminal(terminal, beacon) {
         socket.onmessage = event => {
             if (event.data.length > 0) {
                 terminal.echo(event.data)
+                terminal.echo('\r')
              //   terminal.echo()
 //                console.log("'" + event.data + "'")
             }
         }
-
         terminal.socket = socket
+        console.log(terminal.socket, "list")
     }
 }
 
@@ -129,16 +163,17 @@ function createBeaconTab(beacon) {
     bTab.innerHTML += '<button class="beaconTabButton" onclick="openBeaconTab(\'' + beacon.Id + '\')">' + beacon.Id + '</button>'
     bTabDivs.innerHTML += '<div id="' + beacon.Id + '" class="beaconTab console" style="display:none"></div>'
     jQuery(function($, undefined) {
-        $('#'+beacon.Id).terminal(function(command) {
+        var beaconElement = $('#'+beacon.Id)   
+        beaconElement.terminal(function(command) {
             let terminal = this
-            addTerminal(terminal, beacon)
+            addTerminal(this, beacon, command)
             try { terminal.socket.send("beacon:" + beacon.Id + ":" + command) } catch(error) {}
         }, {
             greetings: '',
             name: beacon.Id + "_term",
-            height: 600,
-            prompt: beacon.Id + '@' + beacon.Ip + '> '
-        });
+            height: 700,
+            prompt: beacon.Id + '@' + beacon.Ip + '> ',
+        })
     });
 }
 

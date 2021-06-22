@@ -2,6 +2,7 @@ package main
 
 import (
 	//"io/ioutil"
+	//"fmt"
 	"net/http"
 	"encoding/json"
 	"github.com/gorilla/websocket"
@@ -41,4 +42,11 @@ func (server WebInterface) beaconsHandler(w http.ResponseWriter, h *http.Request
 
 func (server WebInterface) listenersHandler(w http.ResponseWriter, h *http.Request) {
 	json.NewEncoder(w).Encode(listeners)
+}
+
+func (server WebInterface) newBeaconHandler(w http.ResponseWriter, h *http.Request) {
+	platform := h.URL.Query()["platform"][0]
+	arch := h.URL.Query()["arch"][0]
+
+	processInput("create 0 " + platform + " " + arch)
 }

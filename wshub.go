@@ -2,7 +2,7 @@ package main
 
 import (
 	//"os"
-	"fmt"
+	//"fmt"
 	"time"
 	"strings"
 )
@@ -45,16 +45,16 @@ func (h *Hub) run() {
 				close(client.send)
 			}
 		case message := <-h.broadcast:
-			fmt.Println("MESSAGE " + string(message))
-			
 			if redirectStdIn {
 				terminalPipe <- strings.Join(strings.Split(string(message), ":")[2:], ":")
 			} else {
 				msgSplit := strings.Split(string(message), ":")
-				fmt.Println(msgSplit)
+				//fmt.Println(strings.Join(msgSplit[2:], ":"))
 				if msgSplit[0] == "beacon" { 
 					processInput("use " + string(msgSplit[1]))
 					processInput(strings.Join(msgSplit[2:], ":"))					
+				} else if msgSplit[0] == "main" {
+					processInput(strings.Join(msgSplit[2:], ":"))
 				}
 			}
 		}

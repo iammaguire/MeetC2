@@ -157,6 +157,7 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 			for i := 0; i < len(beacons); i++ {
 				if beacon == beacons[i] {
 					idx = i
+					webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"Beacon Exit", beacon.Id + "@" + beacon.Ip})
 					fmt.Println("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " has exited")
 					if activeBeacon == beacon {
 						activeBeacon = nil
@@ -177,6 +178,7 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 			fmt.Print(string(data))
 
 			if string(data) == "Success" {
+				webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"Migrate success", beacon.Id + "@" + beacon.Ip})
 				fmt.Println("! Beacon will exit - wait for callback from migrated process.")
 			} else {
 				fmt.Println()

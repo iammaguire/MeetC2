@@ -5,8 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MeetC2</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">
-    <link rel="stylesheet" href="./include/css/dashboard.css">
 </head>
 
 <body>
@@ -110,6 +108,14 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Beacon terminals -->
+                    <div class="beaconTabs">
+                        <div id="beaconTabId">
+                        </div>
+                        <div id="beaconTabDivs">
+                        </div>
+                    </div>
                 </main>
             </div>
             <div class="tabcontent" id="listeners">
@@ -147,9 +153,14 @@
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="./include/js/jquery-3.6.0.min.js"></script>
     <script src="./include/js/dashboard.js"></script>
-    <script src="https://unpkg.com/feather-icons/dist/feather.min.js"></script>
+    <script src="./include/js/jquery.terminal.min.js"></script>
+    <script src="./include/js/notify.js"></script>
+    <script src="./include/js/feather.min.js"></script>
+    <link href="./include/css/jquery.terminal.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">
+    <link rel="stylesheet" href="./include/css/dashboard.css">
     <script>
         feather.replace()
     </script>

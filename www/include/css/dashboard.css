@@ -94,4 +94,33 @@ body {
     background-color: rgba(255, 255, 255, .1);
     border-color: rgba(255, 255, 255, .1);
   }
-  
+
+.beaconTabs {
+  overflow: hidden;
+  border: 1px solid #CCC;
+  background-color: #222
+}
+
+#beaconTabDivs {
+  margin: 10px;
+}
+
+#beaconTabId {
+  overflow: hidden;
+  background-color: #EEE;
+}
+
+#beaconTabId button {
+  background-color: #EEE;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 5px 16px;
+  transition: 0.3s;
+}
+
+
+#beaconTabId button:hover {
+  background-color: #DDD;
+}

@@ -12,16 +12,31 @@ type IWebInterface interface {
 	startListener() (error)
 	beaconsHandler(http.ResponseWriter, *http.Request)
 	listenersHandler(http.ResponseWriter, *http.Request)
+	commandHandler(http.ResponseWriter, *http.Request)
+	terminalHandler(http.ResponseWriter, *http.Request)
 }
 
 type WebInterface struct {
 	port int
 }
 
+type WebUpdate struct {
+	Title string
+	Msg string
+}
+
+var webInterfaceUpdates []*WebUpdate = make([]*WebUpdate, 0)
+var stdOutBuffer []byte
+
 func (server WebInterface) startListener() (error) {
+	hub := newHub()
+	go hub.run()
+
 	var router = mux.NewRouter()
 	router.HandleFunc("/api/beacons", server.beaconsHandler).Methods("Get")
 	router.HandleFunc("/api/listeners", server.listenersHandler).Methods("Get")
+	router.HandleFunc("/api/updates", server.updateHandler).Methods("Get")
+	router.HandleFunc("/api/ws", func(w http.ResponseWriter, r *http.Request) { server.wsHandler(hub, w, r) })
 
 	staticFileDirectory := http.Dir("./www/")
 	staticFileHandler := http.StripPrefix("/c2/", http.FileServer(staticFileDirectory))

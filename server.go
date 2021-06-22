@@ -91,6 +91,7 @@ func registerBeacon(updateData CommandUpdate) (*Beacon) {
 
 	if beacon == nil || beacon.Ip == "n/a" {
 		fmt.Println("[+] New beacon " + updateData.Id + "@" + updateData.Ip)
+		webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"New Beacon", updateData.Id + "@" + updateData.Ip})
 		beacon = &Beacon { updateData.Ip, updateData.Id, updateData.User, updateData.Platform, updateData.Arch, updateData.Pid, updateData.Pname, nil, nil, nil, nil, nil, time.Now() }
 		beacons = append(beacons, beacon)
 	} else {
@@ -472,5 +473,23 @@ func main() {
 
 	//listeners = append(listeners, &HttpListenerTun0)
 	listeners = append(listeners, &HttpListenerLocalhost)
+
+	go func() {
+		for {
+			rescueStdout := os.Stdout
+			stdOutHook, wr, _ := os.Pipe()
+			os.Stdout = wr
+			time.Sleep(time.Millisecond * 20)
+			wr.Close()
+			out, _ := ioutil.ReadAll(stdOutHook)
+			os.Stdout = rescueStdout
+			
+			if(len(out) > 0) {
+				stdOutBuffer = append(stdOutBuffer, []byte(strings.ReplaceAll(string(out), "c2> ", ""))...)
+				fmt.Print(string(out))
+			}
+		}
+	}()
+
 	handleInput()
 }

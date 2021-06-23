@@ -1,8 +1,12 @@
 var beacons = new Array();
 var listeners = new Array();
+var modules = new Array();
 var terminals = new Array();
 
-var intervalId = window.setInterval(function () {
+var selectedModule;
+var editor;
+
+window.setInterval(function () {
     $.ajax({
         type: "GET",
         url: "http://127.0.0.1:8000/api/beacons",
@@ -13,6 +17,7 @@ var intervalId = window.setInterval(function () {
             //console.log(jqXHR)
         },
     });
+
     $.ajax({
         type: "GET",
         url: "http://127.0.0.1:8000/api/listeners",
@@ -28,13 +33,14 @@ var intervalId = window.setInterval(function () {
             //console.log(jqXHR)
         },
     });
+
     $.ajax({
         type: "GET",
         url: "http://127.0.0.1:8000/api/updates",
         success: function (d) {
             dec = JSON.parse(d)
             for (var i = 0; i < dec.length; i++) {
-                $.notify(dec[i].Title + "\n" + dec[i].Msg, "info");
+                $.notify(dec[i].Title + "\n" + dec[i].Msg, "success");
             }
         },
         error: function (jqXHR, textStatus, errorThrown) {
@@ -43,8 +49,50 @@ var intervalId = window.setInterval(function () {
     });
 }, 1000);
 
-$(document).ready(function() {    
-    $('#newBeaconBtn').click(function() { $("#newBeaconModal").modal('show'); }) 
+window.setInterval(function () {
+    updateModule();
+}, 10000);
+
+window.setInterval(function () {
+    if (selectedModule != null) {
+        selectedModule.source = editor.getValue();
+    }
+}, 100);
+
+$(document).ready(function() {  
+    editor = ace.edit("codeEditor");
+    editor.setTheme("ace/theme/light");
+    editor.session.setMode("ace/mode/csharp");
+    editor.setOptions({
+        fontSize: "11pt"
+    });
+
+    $('#newModuleBtn').click(function() { $("#newModuleModal").modal('show'); });
+    $('#newBeaconBtn').click(function() { $("#newBeaconModal").modal('show'); });
+    
+    $('#validateBtn').click(function() { 
+        if (selectedModule != null) { 
+            updateModule();
+            $.ajax({
+                type: "GET",
+                url: "http://127.0.0.1:8000/api/compile",
+                data: { name: selectedModule.Name },
+                success: function (d) {
+                    if (d == "Good") {
+                        $.notify("Compiled without error", "success");
+                        $('#codeStackTrace').html("Compiled without error")
+                    } else {
+                        $.notify("Errors occurred during compilation", "error");
+                        $('#codeStackTrace').html(d.replace(/\n/g, "<br />"))
+                    }
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    //console.log(jqXHR)
+                },
+            });
+        }
+    }) 
+
     $('#newHTTPListenerBtn').click(function() { 
         $.ajax({
             type: "GET",
@@ -64,7 +112,7 @@ $(document).ready(function() {
         });
 
         $("#newHTTPListenerModal").modal('show'); 
-    }) 
+    });
     
     var beaconElement = $('#mainTerminal')   
     beaconElement.terminal(function(command) {
@@ -80,10 +128,6 @@ $(document).ready(function() {
     addTerminal(beaconElement, null, "")  
     ShowView(null, 'dashboard');
 });
-
-function newBeacon() {
-    console.log('new beacon!')
-}
 
 $('#beaconForm').submit(function(e){
     e.preventDefault();
@@ -129,10 +173,116 @@ $('#httpListenerForm').submit(function(e) {
     });
 });
 
+window.onbeforeunload = function(){
+    updateModule();
+}
 
-function jsonToTable(data, idName) {
+window.addEventListener("beforeunload", function(e){
+    updateModule();
+}, false);
+
+$('#moduleForm').submit(function(e) {
+    e.preventDefault();
+
+    var name = $('#moduleName').val();
+    var language = $('#moduleLanguage').val();
+
+    for (i = 0; i < modules.length; i++) {
+        if (modules[i].Name == name) {
+            $.notify("Module already exists", "error");
+            return
+        }
+    }
+    
+    sampleSource = `namespace Module {
+    using System;
+
+    static class ` + name + ` {
+        static void Main(string[] args) {
+            Console.WriteLine("Hello world!"); 
+        } 
+    }\n}`
+
+    module = { Name: name, Language: language, Source: sampleSource }
+    selectedModule = module
+    modules.push(module);
+           
+    editor.setValue(sampleSource, 1);
+
+    updateModule();
+    getModules();
+
+    $("#newModuleModal").modal("hide");
+    $('#codeEditorContainer').css('display:block');
+});
+
+function switchModuleCode(row) {
+    updateModule();
+    getModules();
+    console.log('adasdasdasdasd')
+    $('#codeEditorContainer').css('display', 'block');
+
+    moduleName = row.innerHTML.split('<td>')[1].split('</td>')[0];
+
+    for (i = 0; i < modules.length; i++) {
+        if (modules[i].Name === moduleName) {
+            selectedModule = modules[i];
+            editor.setValue(modules[i].Source, 1);
+
+            $('#editorModuleFilename').html(modules[i].Name)
+            $('#codeEditorContainer').css('display:block');
+
+            break;
+        }
+    }
+}
+
+function newBeacon() {
+    console.log('new beacon!')
+}
+
+function updateModule() {
+    if (selectedModule != null) {
+        selectedModule.Source = editor.getValue();
+        $.ajax({
+            type: "GET",
+            async: false,
+            url: "http://127.0.0.1:8000/api/updatemodule",
+            data: { name: selectedModule.Name, language: selectedModule.Language, source: selectedModule.Source },
+        });
+    }
+}
+
+function getModules() {
+    $.ajax({
+        type: "GET",
+        url: "http://127.0.0.1:8000/api/modules",
+        success: function (d) {
+            modules = new Array();
+            data = JSON.parse(d)
+            
+            for (i = 0; i < data.length; i++) {
+                modules.push(data[i])
+            }
+
+            filteredData = Array();
+            var filter = ({ Name, Source, Language }) => ({ Name, Language });
+            
+            for(i = 0; i < data.length; i++) {
+                filteredData.push(filter(data[i]));
+            }
+
+            jsonToTable(JSON.stringify(filteredData), "#module-table", true, "", "switchModuleCode(this)")
+        },
+        error: function (jqXHR, textStatus, errorThrown) {
+            //console.log(jqXHR)
+        },
+    });
+}
+
+function jsonToTable(data, idName, clickable = false, className = "", clickCallback = "") {
     var data = JSON.parse(data)
-    var html = '<table class="table table-striped">';
+    var html = '<table class="table table-striped table-hover">';
     html += '<thead><tr>';
     var flag = 0;
     $.each(data[0], function (index, value) {
@@ -154,7 +304,7 @@ function jsonToTable(data, idName) {
             }
         }
         
-        html += '<tr>';
+        html += '<tr' + (clickCallback != "" ? ' onclick="' + clickCallback + '" ' : '') + (className != '' ? ' class="' + className + '" ' : "") + (clickable ? ' role="button">' : '>');
         $.each(value, function (index2, value2) {
             html += '<td>' + value2 + '</td>';
         });

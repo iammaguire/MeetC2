@@ -18,6 +18,8 @@ type IWebInterface interface {
 	newBeaconHandler(http.ResponseWriter, *http.Request)
 	newHTTPListenerHandler(http.ResponseWriter, *http.Request)
 	netInterfacesHandler(http.ResponseWriter, *http.Request)
+	modulesHandler(http.ResponseWriter, *http.Request)
+	newModuleHandler(http.ResponseWriter, *http.Request)
 }
 
 type WebInterface struct {
@@ -47,6 +49,9 @@ func (server WebInterface) startListener() (error) {
 	router.HandleFunc("/api/newbeacon", server.newBeaconHandler).Methods("Get")
 	router.HandleFunc("/api/newhttplistener", server.newHTTPListenerHandler).Methods("Get")
 	router.HandleFunc("/api/netifaces", server.netInterfacesHandler).Methods("Get")
+	router.HandleFunc("/api/modules", server.modulesHandler).Methods("Get")
+	router.HandleFunc("/api/compile", server.compileHandler).Methods("Get")
+	router.HandleFunc("/api/updatemodule", server.updateModuleHandler).Methods("Get")
 	router.HandleFunc("/api/ws", func(w http.ResponseWriter, r *http.Request) { server.wsHandler(hub, w, r) })
 
 	staticFileDirectory := http.Dir("./www/")

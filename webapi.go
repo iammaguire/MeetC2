@@ -53,6 +53,38 @@ func (server WebInterface) newBeaconHandler(w http.ResponseWriter, h *http.Reque
 	processInput("create 0 " + platform + " " + arch)
 }
 
+func (server WebInterface) updateModuleHandler(w http.ResponseWriter, h *http.Request) {
+	name := h.URL.Query()["name"][0]
+	language := h.URL.Query()["language"][0]
+	source := h.URL.Query()["source"][0]
+
+	updateModule(name, language, source)
+}
+
+func (server WebInterface) modulesHandler(w http.ResponseWriter, h *http.Request) {
+	json.NewEncoder(w).Encode(csharpModules)
+}
+
+func (server WebInterface) compileHandler(w http.ResponseWriter, h *http.Request) {
+	name := h.URL.Query()["name"][0]
+
+	for _, module := range csharpModules {
+		if module.Name == name {
+			err := module.compile()
+
+			if err != nil {
+				w.Write([]byte(err.Error()))
+			} else {
+				w.Write([]byte("Good"))
+			}
+
+			return
+		}
+	}
+
+	w.Write([]byte("Backend error... module not found."))
+}
+
 func (server WebInterface) newHTTPListenerHandler(w http.ResponseWriter, h *http.Request) {
 	iface := h.URL.Query()["interface"][0]
 	hostname := h.URL.Query()["hostname"][0]

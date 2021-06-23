@@ -510,6 +510,20 @@ func main() {
 		info("Failed to start http server.")
 	}
 
+	mod := CSharpModule { 
+		source: `
+			namespace Module {
+				using System;
+				class ModEntry {
+					static void Main(string[] args) {
+						Console.WriteLine("Hello Shellcode!");
+					}
+				}
+			}
+		`,
+	}
+	mod.compile()
+
 	//listeners = append(listeners, &HttpListenerTun0)
 	listeners = append(listeners, &HttpListenerLocalhost)
 	handleInput()

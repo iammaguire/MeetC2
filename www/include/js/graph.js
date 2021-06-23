@@ -1,20 +1,52 @@
-var graph = new Springy.Graph();
+$(document).ready(function() {    
+   var cy = cytoscape({
 
-// make some nodes
-var spruce = graph.newNode({label: 'Norway Spruce'});
-var fir = graph.newNode({label: 'Sicilian Fir'});
+    container: document.getElementById('cy'), // container to render in
 
-// connect them with an edge
-graph.newEdge(spruce, fir);
+    elements: [ // list of graph elements to start with
+      { // node a
+        data: { id: 'a' }
+      },
+      { // node b
+        data: { id: 'b' }
+      },
+      { // edge ab
+        data: { id: 'ab', source: 'a', target: 'b' }
+      }
+    ],
 
-var layout = new Springy.Layout.ForceDirected(
-    graph,
-    400.0, // Spring stiffness
-    400.0, // Node repulsion
-    0.5 // Damping
-  );
+    style: [ // the stylesheet for the graph
+      {
+        selector: 'node',
+        style: {
+          'background-color': '#666',
+          'width': '100%',
+          'label': 'data(id)'
+        }
+      },
 
-  renderer.start();
+      {
+        selector: 'edge',
+        style: {
+          'width': 100,
+          'line-color': '#ccc',
+          'target-arrow-color': '#ccc',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier'
+        }
+      }
+    ],
 
+    layout: {
+      name: 'grid',
+      rows: 1
+    }
 
-  $('#graph').springy({ graph: graph });
+  });
+  cy.add({
+    group: "nodes",
+    data: { id: 'x' },
+    position: { x: 190 , y: 190  }
+});
+  cy.resize()
+})

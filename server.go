@@ -58,6 +58,7 @@ var cmdArgs = map[string]string {
     "create": "<listener> <target> <target arch>",
 	"download": "<beacon id OR index> <remote file> OR <remote file>...",
 	"upload": "<beacon id OR index> <local file> OR <local file>...",
+	"mimikatz": "<arguments>...",
 	"use": "<beacon id OR index>",
 	"script": "<beacon id OR index> <local file path> <remote executor path>",
 	// beacon commands

@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"os/user"
 	"net/http"
-//	"encoding/hex"
+	//"encoding/hex"
 	"encoding/json"
 	ps "github.com/mitchellh/go-ps"
 	"github.com/thecodeteam/goodbye"

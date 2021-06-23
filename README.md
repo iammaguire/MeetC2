@@ -32,6 +32,9 @@ help <command>
 ```
 
 Todo list:
+- Mimikatz support: finished
+- Generic modules:
+    - C#: WIP
 - Exec:
     - HTTP: finished
 - Upload

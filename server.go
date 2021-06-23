@@ -418,6 +418,12 @@ func processInput(input string) {
 				} else {
 					info("Interact with a beacon first (use).")
 				}
+			case "mimikatz":
+				if activeBeacon != nil {
+					execOnBeacon(append([]string{"exec"}, cmd...))
+				} else {
+					info("Interact with a beacon first (use).")
+				}
 			default:
 				info(cmd[0] + " is not a command. Use help to show available commands.")
 			}

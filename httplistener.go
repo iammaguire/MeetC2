@@ -182,6 +182,10 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 			} else {
 				info()
 			}
+		} else if update.Type == "mimikatz" {
+			info("[+] Mimikatz: ")
+			data, _ := b64.StdEncoding.DecodeString(update.Data)
+			infof(string(data))
 		}
 		prompt()
 	}

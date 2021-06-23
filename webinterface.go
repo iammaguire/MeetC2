@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"time"
+	"mime"
 	"strconv"
 	"net/http"
 	"github.com/gorilla/mux"
@@ -35,6 +36,7 @@ var wsWriter http.ResponseWriter
 var hub *Hub
 
 func (server WebInterface) startListener() (error) {
+	mime.AddExtensionType(".js", "application/javascript")
 	hub = newHub()
 	go hub.run()
 

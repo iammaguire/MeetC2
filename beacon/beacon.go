@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"os/user"
 	"net/http"
+//	"encoding/hex"
 	"encoding/json"
 	ps "github.com/mitchellh/go-ps"
 	"github.com/thecodeteam/goodbye"
@@ -36,7 +37,7 @@ var ip string
 var pid string
 var pname string
 var queryData string
-var debug bool = true
+var debug bool = false
 var curUser string
 var platform string
 var arch string

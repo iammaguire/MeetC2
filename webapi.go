@@ -1,8 +1,8 @@
 package main
 
 import (
-	//"io/ioutil"
-	//"fmt"
+	// "io/ioutil"
+	// "fmt"
 	"net"
 	"strings"
 	"net/http"
@@ -62,13 +62,13 @@ func (server WebInterface) updateModuleHandler(w http.ResponseWriter, h *http.Re
 }
 
 func (server WebInterface) modulesHandler(w http.ResponseWriter, h *http.Request) {
-	json.NewEncoder(w).Encode(csharpModules)
+	json.NewEncoder(w).Encode(modules)
 }
 
 func (server WebInterface) compileHandler(w http.ResponseWriter, h *http.Request) {
 	name := h.URL.Query()["name"][0]
 
-	for _, module := range csharpModules {
+	for _, module := range modules {
 		if module.Name == name {
 			_, err := module.compile(true)
 

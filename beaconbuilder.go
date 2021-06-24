@@ -145,7 +145,7 @@ func createBeacon(listener int, platform string, arch string) {
 	
 	if target == "windows" {
 		output = ""
-		cmdHandle := exec.Command("/bin/sh", "-c", "./includes/donut out/" + beaconName + " -o out/" + beaconName + ".bin")
+		cmdHandle := exec.Command("/bin/sh", "-c", "./includes/donut -c TestModule2 -m Main out/" + beaconName + " -o out/" + beaconName + ".bin")
 		stdout, err := cmdHandle.StdoutPipe()
 		stderr, err := cmdHandle.StderrPipe()
 

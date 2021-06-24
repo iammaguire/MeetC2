@@ -15,6 +15,8 @@ import (
 	"github.com/thecodeteam/goodbye"
 )
 
+// https://posts.specterops.io/designing-peer-to-peer-command-and-control-ad2c61740456
+
 type Beacon struct {
 	Ip string
 	Id string

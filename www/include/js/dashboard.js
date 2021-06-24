@@ -60,11 +60,14 @@ window.setInterval(function () {
 }, 100);
 
 $(document).ready(function() {  
+    ace.require("ace/ext/language_tools");
     editor = ace.edit("codeEditor");
-    editor.setTheme("ace/theme/light");
+    editor.setTheme("ace/theme/dawn");
     editor.session.setMode("ace/mode/csharp");
     editor.setOptions({
-        fontSize: "11pt"
+        enableLiveAutocompletion: true,
+        fontSize: "11pt",
+        showPrintMargin: false
     });
 
     $('#newModuleBtn').click(function() { $("#newModuleModal").modal('show'); });
@@ -186,6 +189,7 @@ $('#moduleForm').submit(function(e) {
 
     var name = $('#moduleName').val();
     var language = $('#moduleLanguage').val();
+    var sampleSource = "";
 
     for (i = 0; i < modules.length; i++) {
         if (modules[i].Name == name) {
@@ -193,15 +197,26 @@ $('#moduleForm').submit(function(e) {
             return
         }
     }
-    
-    sampleSource = `namespace Module {
-    using System;
 
+    if (language == "C#") {
+        sampleSource = `namespace Module {
+    using System;
+    
     static class ` + name + ` {
         static void Main(string[] args) {
             Console.WriteLine("Hello world!"); 
         } 
     }\n}`
+    } else if (language == "Go") {
+        sampleSource = `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello from module!")
+}`
+    }
+
 
     module = { Name: name, Language: language, Source: sampleSource }
     selectedModule = module

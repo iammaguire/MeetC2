@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 )
 
-type Module interface {
+type IModule interface {
 	compile() error
 	setSource(string)
 	getName() string
@@ -18,17 +18,26 @@ type Module interface {
 	writeToDisk()
 }
 
-type CSharpModule struct {
+type Module struct {
 	Name string  
 	Source string
 	Language string
+	extension string
 }
 
-func newCSharpModule(name string, source string) *CSharpModule {
-	return &CSharpModule { name, source, "C#" }
+func newModule(name string, source string, language string) *Module {
+	var extension string
+
+	if language == "Go" {
+		extension = ".go"
+	} else if language == "C#" {
+		extension = ".cs"
+	}
+
+	return &Module { name, source, language, extension }
 }
 
-func (mod CSharpModule) getShellcode() []byte {
+func (mod Module) getShellcode() []byte {
 	fileName, err := mod.compile(false)
 	shellcodeFileName := "modules/" + mod.Name + ".bin"
 
@@ -38,7 +47,7 @@ func (mod CSharpModule) getShellcode() []byte {
 	}
 
 	output := ""
-	cmdHandle := exec.Command("/bin/sh", "-c", "./includes/donut " + fileName + " -o " + shellcodeFileName)
+	cmdHandle := exec.Command("/bin/sh", "-c", "./includes/donut -x 1 -c TestModule2 -m Main " + fileName + " -o " + shellcodeFileName)
 	stdout, err := cmdHandle.StdoutPipe()
 	stderr, err := cmdHandle.StderrPipe()
 
@@ -70,16 +79,16 @@ func (mod CSharpModule) getShellcode() []byte {
 	}
 }
 
-func (mod CSharpModule) writeToDisk() {
-	ioutil.WriteFile("modules/" + mod.Name + ".cs", []byte(mod.Source), 0644)
+func (mod Module) writeToDisk() {
+	ioutil.WriteFile("modules/" + mod.Name + mod.extension, []byte(mod.Source), 0644)
 }
 
-func (mod CSharpModule) setSource(source string) {
+func (mod Module) setSource(source string) {
 	mod.Source = source
 }
 
-func (mod CSharpModule) getSourceFromDisk() string {
-	source, err := ioutil.ReadFile("modules/" + mod.Name + ".cs")
+func (mod Module) getSourceFromDisk() string {
+	source, err := ioutil.ReadFile("modules/" + mod.Name + mod.extension)
 	
 	if err != nil {
 		return ""
@@ -89,20 +98,28 @@ func (mod CSharpModule) getSourceFromDisk() string {
 	}
 }
 
-func (mod CSharpModule) getLanguage() string {
+func (mod Module) getLanguage() string {
 	return "C#"
 }
 
-func (mod CSharpModule) getName() string {
+func (mod Module) getName() string {
 	return mod.Name
 }
 
-func (mod CSharpModule) compile(delete bool) (string, error) {
+func (mod Module) compile(delete bool) (string, error) {
+	var cmdHandle *exec.Cmd
 	filename := "/tmp/" + genRandID()
 	outfile := "modules/" + mod.Name + ".exe"
     err := ioutil.WriteFile(filename, []byte(mod.Source), 0644)
-	cmdHandle := exec.Command("/bin/sh", "-c", "mcs -out:" + outfile + " " + filename)
-	
+
+	fmt.Println(mod.Language)
+
+	if mod.Language == "C#" {
+		cmdHandle = exec.Command("/bin/sh", "-c", "mcs -out:" + outfile + " " + filename)
+	} else if mod.Language == "Go" {
+		cmdHandle = exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags '-s -w' -o " + outfile + " modules/" + mod.Name + ".go")
+	}
+
 	stderr, err := cmdHandle.StderrPipe()
 	stdout, err := cmdHandle.StdoutPipe()
 	

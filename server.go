@@ -47,8 +47,9 @@ const idBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 var idLen int = 8
 var listeners []*HttpListener = make([]*HttpListener, 0)
 var beacons []*Beacon = make([]*Beacon, 0)
-var csharpModules []*CSharpModule = make([]*CSharpModule, 0)
+var modules []*Module = make([]*Module, 0)
 var activeBeacon *Beacon
+var securityContext *SecurityContext
 var activeBeaconInteractive = false
 var cmdArgs = map[string]string {
     "help": "<command>...",
@@ -127,8 +128,8 @@ func genRandID() string {
 	return string(b)
 }
 
-func getModuleByName(name string) *CSharpModule {
-	for _, m := range csharpModules {
+func getModuleByName(name string) *Module {
+	for _, m := range modules {
 		if m.Name == name {
 			return m
 		}
@@ -137,7 +138,7 @@ func getModuleByName(name string) *CSharpModule {
 	return nil
 }
 
-func execModuleHelper(beacon *Beacon, module *CSharpModule, arguments string) {
+func execModuleHelper(beacon *Beacon, module *Module, arguments string) {
 	shellcode := module.getShellcode()
 
 	if len(shellcode) == 0 {
@@ -151,7 +152,7 @@ func execModuleHelper(beacon *Beacon, module *CSharpModule, arguments string) {
 
 func execModuleOnBeacon(cmd[] string) {
 	if cmd[1] == "list" {
-		for i, module := range csharpModules {
+		for i, module := range modules {
 			info("[" + strconv.Itoa(i) + "] " + module.Name)
 		}
 		return
@@ -405,7 +406,7 @@ func notifyBeaconOfProxyUpdate(proxy *Beacon, targetId string) {
 }
 
 func updateModule(name string, language string, source string) {
-	for _, module := range csharpModules {
+	for _, module := range modules {
 		if module.Name == name {
 			module.Source = source
 			module.writeToDisk()
@@ -413,9 +414,9 @@ func updateModule(name string, language string, source string) {
 		}
 	}
 	
-	newMod := newCSharpModule(name, source)
+	newMod := newModule(name, source, language)
 	newMod.writeToDisk()
-	csharpModules = append(csharpModules, newMod)
+	modules = append(modules, newMod)
 }
 
 func processInput(input string) {
@@ -572,12 +573,18 @@ func loadModules() {
 		}
 
 		if fileType == "cs" {
-			csharpModules = append(csharpModules, newCSharpModule(name, string(source)))
+			modules = append(modules, newModule(name, string(source), "C#"))
+		} else if fileType == "go" {
+			modules = append(modules, newModule(name, string(source), "Go"))
 		}
     }
 }
 
 func main() {
+	securityContext = &SecurityContext {
+
+	}
+
 	var WebInterface = WebInterface {
 		port: 8000,
 	}

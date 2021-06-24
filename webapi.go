@@ -70,7 +70,7 @@ func (server WebInterface) compileHandler(w http.ResponseWriter, h *http.Request
 
 	for _, module := range csharpModules {
 		if module.Name == name {
-			err := module.compile()
+			_, err := module.compile(true)
 
 			if err != nil {
 				w.Write([]byte(err.Error()))

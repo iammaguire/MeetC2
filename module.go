@@ -10,10 +10,11 @@ import (
 
 type Module interface {
 	compile() error
+	setSource(string)
 	getName() string
 	getLanguage() string
 	getSourceFromDisk() string
-	setSource(string)
+	getShellcode() []byte
 	writeToDisk()
 }
 
@@ -25,6 +26,48 @@ type CSharpModule struct {
 
 func newCSharpModule(name string, source string) *CSharpModule {
 	return &CSharpModule { name, source, "C#" }
+}
+
+func (mod CSharpModule) getShellcode() []byte {
+	fileName, err := mod.compile(false)
+	shellcodeFileName := "modules/" + mod.Name + ".bin"
+
+	if err != nil {
+		info("Failed to compile module: " + err.Error())
+		return []byte{}
+	}
+
+	output := ""
+	cmdHandle := exec.Command("/bin/sh", "-c", "./includes/donut " + fileName + " -o " + shellcodeFileName)
+	stdout, err := cmdHandle.StdoutPipe()
+	stderr, err := cmdHandle.StderrPipe()
+
+	if err = cmdHandle.Start(); err == nil {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			output += scanner.Text()
+			output += "\n"
+		}
+		
+		scanner = bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			output += scanner.Text()
+			output += "\n"
+		}
+	}
+
+	info(output)
+
+	data, err := ioutil.ReadFile(shellcodeFileName)
+
+	//os.Remove(fileName)
+	//os.Remove(shellcodeFileName)
+
+	if err != nil {
+		return []byte{}
+	} else {
+		return data
+	}
 }
 
 func (mod CSharpModule) writeToDisk() {
@@ -54,9 +97,9 @@ func (mod CSharpModule) getName() string {
 	return mod.Name
 }
 
-func (mod CSharpModule) compile() error {
+func (mod CSharpModule) compile(delete bool) (string, error) {
 	filename := "/tmp/" + genRandID()
-	outfile := "/tmp/" + genRandID()
+	outfile := "modules/" + mod.Name + ".exe"
     err := ioutil.WriteFile(filename, []byte(mod.Source), 0644)
 	cmdHandle := exec.Command("/bin/sh", "-c", "mcs -out:" + outfile + " " + filename)
 	
@@ -92,11 +135,14 @@ func (mod CSharpModule) compile() error {
 	}
 
 	os.Remove(filename)
-	os.Remove(outfile)
 
+	if delete {
+		os.Remove(outfile)
+	}
+	
 	if len(output) == 0 {
-		return nil
+		return outfile, nil
 	} else {
-		return fmt.Errorf("%s", output)
+		return outfile, fmt.Errorf("%s", output)
 	}
 } 

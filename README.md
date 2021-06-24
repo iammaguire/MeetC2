@@ -1,5 +1,7 @@
 
 
+https://user-images.githubusercontent.com/7650862/123324333-38011280-d526-11eb-8765-786f0fe7e1ee.mp4
+
 https://user-images.githubusercontent.com/7650862/122882317-91e9b880-d32b-11eb-82da-da6bf98a7044.mp4
 
 Usage:
@@ -35,6 +37,7 @@ Todo list:
 - Mimikatz support: finished
 - Generic modules:
     - C#: WIP
+    - Go: finished
 - Exec:
     - HTTP: finished
 - Upload

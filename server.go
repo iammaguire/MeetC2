@@ -42,6 +42,11 @@ type Beacon struct {
 	LastSeen time.Time
 }
 
+type BeaconMessage struct {
+	Data []byte
+	Route []byte
+}
+
 const idBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 var idLen int = 8
@@ -581,9 +586,7 @@ func loadModules() {
 }
 
 func main() {
-	securityContext = &SecurityContext {
-
-	}
+	securityContext = newSecurityContext()
 
 	var WebInterface = WebInterface {
 		port: 8000,
@@ -594,31 +597,18 @@ func main() {
 		info("Failed to start web interface.")
 	}
 
-	//var HttpListenerTun0 = HttpListener {
-//		Iface: "tun0",
-//		Hostname: "command.com",
-//		Port: 8001,
-//	}
-
 	var HttpListenerLocalhost = HttpListener {
 		Iface: "enp0s20f0u1",
 		Hostname: "command.com",
 		Port: 8000,
 	}
 
-	//err = HttpListenerTun0.startListener()
-	//if err != nil {
-	//	info("Failed to start http server.")
-	//}
-
 	err = HttpListenerLocalhost.startListener()
 	if err != nil {
 		info("Failed to start http server.")
+	} else {
+		listeners = append(listeners, &HttpListenerLocalhost)
 	}
-
-
-	//listeners = append(listeners, &HttpListenerTun0)
-	listeners = append(listeners, &HttpListenerLocalhost)
 
 	loadModules()
 	handleInput()

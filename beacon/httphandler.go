@@ -39,11 +39,29 @@ func (packet BeaconHttp) queryServer() {
 		
 		controlDataBytes, err := io.ReadAll(resp.Body)
 		debugFatal(err)
+		encData, _ := b64.StdEncoding.DecodeString(string(controlDataBytes))
+		data := securityContext.decrypt(encData)
 
+		var beaconMsg BeaconMessage
 		var commResp CommandResponse
-		json.Unmarshal(controlDataBytes, &commResp)
+		json.Unmarshal([]byte(data), &beaconMsg)
+		fmt.Println(beaconMsg.Data)
+		beaconData, err := b64.StdEncoding.DecodeString(beaconMsg.Data)
+		beaconRoute, err := b64.StdEncoding.DecodeString(beaconMsg.Route)
 		
-		packet.handleQueryResponse(commResp)
+		if err != nil {
+			debugFatal(err)
+			return
+		}
+		
+		json.Unmarshal(beaconData, &commResp)
+
+		if len(beaconRoute) > 0 {
+			if beaconRoute[0] == 0 {
+				json.Unmarshal([]byte(beaconData), &commResp)
+				packet.handleQueryResponse(commResp)
+			}
+		}
 	} else if debug {
 		fmt.Println("Couldn't reach command.")
 	}

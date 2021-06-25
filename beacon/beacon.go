@@ -34,6 +34,7 @@ var cmdProxyId string
 var cmdAddress string
 var cmdPort string
 var cmdHost string
+var secret string
 var id string
 var ip string
 var pid string
@@ -43,6 +44,7 @@ var debug bool = false
 var curUser string
 var platform string
 var arch string
+var securityContext BeaconSecurityContext
 var netClient = &http.Client{
 	Timeout: time.Second * 10,
 }
@@ -52,6 +54,9 @@ func queryC2Server(handler Request) {
 }
 
 func main() {
+	securityContext := newBeaconSecurityContext()
+	securityContext.key = []byte(secret)
+
 	user, _ := user.Current()
 	curUser = user.Username
 	platform = runtime.GOOS

@@ -2,50 +2,39 @@ package main
 
 import (
     "io"
-    "io/ioutil"
+    "fmt"
     "crypto/aes"
     "crypto/rand"
     "crypto/cipher"
 )
 
-type SecurityContext struct {
+type BeaconSecurityContext struct {
 	key []byte
 }
 
-func newSecurityContext() *SecurityContext {
-    context := &SecurityContext{ []byte{} }
-    context.loadKey()
+func newBeaconSecurityContext() *BeaconSecurityContext {
+    context := &BeaconSecurityContext{ []byte{} }
     return context  
 }
 
-func (sc *SecurityContext) loadKey() {
-	key, err := ioutil.ReadFile("./includes/sharedkey.txt")
-
-    if err != nil {
-        panic("[!] No key in includes/sharedkey.txt. Exiting!")
-    }
-
-    sc.key = key
-}
-
-func (sc *SecurityContext) encrypt(msg []byte) []byte {
-	c, err := aes.NewCipher(sc.key)
+func (sc *BeaconSecurityContext) encrypt(msg []byte) []byte {
+	c, err := aes.NewCipher([]byte(secret))
     
 	if err != nil {
-        info(err.Error())
+        debugFatal(err)
 		return []byte{}
     }
 
     gcm, err := cipher.NewGCM(c)
 
     if err != nil {
-        info(err.Error())
+        debugFatal(err)
     }
 
     nonce := make([]byte, gcm.NonceSize())
     
 	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-        info(err.Error())
+        debugFatal(err)
     }
 
     enc := gcm.Seal(nonce, nonce, msg, nil)
@@ -53,18 +42,20 @@ func (sc *SecurityContext) encrypt(msg []byte) []byte {
 }
 
 
-func (sc *SecurityContext) decrypt(encrypted []byte) string {
-	block, err := aes.NewCipher(sc.key)
+func (sc *BeaconSecurityContext) decrypt(encrypted []byte) string {
+	block, err := aes.NewCipher([]byte(secret))
 
 	if err != nil {
-		info(err.Error())
+		debugFatal(err)
+        fmt.Println(err)
         return ""
 	}
 
 	gcm, err := cipher.NewGCM(block)
 
 	if err != nil {
-		info(err.Error())
+		debugFatal(err)
+        fmt.Println(err)
         return ""
 	}
 
@@ -73,7 +64,8 @@ func (sc *SecurityContext) decrypt(encrypted []byte) string {
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 
 	if err != nil {
-		info(err.Error())
+		debugFatal(err)
+        fmt.Println(err)
         return ""
 	}
 

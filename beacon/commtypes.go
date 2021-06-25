@@ -24,6 +24,11 @@ type CommandResponse struct {
 	ProxyClients []string
 }
 
+type BeaconMessage struct {
+	Data string
+	Route string
+}
+
 type CommandUpdate struct {
 	Ip string
 	Id string

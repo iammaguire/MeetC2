@@ -3,15 +3,13 @@
 package main
 
 import (
-	"encoding/binary"
-	"flag"
+	"os"
 	"fmt"
 	//"log"
-	"os"
-	"syscall"
+	"flag"
 	"unsafe"
-
-	// Sub Repositories
+	"syscall"
+	"encoding/binary"
 	"golang.org/x/sys/windows"
 )
 

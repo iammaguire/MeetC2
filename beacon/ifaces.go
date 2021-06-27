@@ -9,7 +9,6 @@ type EncType interface {
 
 type Request interface {
 	queryServer()
-    handleQueryResponse(CommandResponse)
     upload(string)
     download(string)
     addProxyClient(Beacon)

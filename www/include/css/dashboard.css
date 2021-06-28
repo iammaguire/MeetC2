@@ -131,8 +131,20 @@ body {
   left:150px;
 }
 
-#graph {
+#beaconGraph {
+  border-top: 1px solid #CCC;
+  border-bottom: 1px solid #CCC;
   width: 100%;
-  height: 100%;
-  display: block;
+  height: 300px;
+}
+
+
+.links line {
+  stroke: #999;
+  stroke-opacity: 0.6;
+}
+
+.nodes circle {
+  stroke: #fff;
+  stroke-width: 1.5px;
 }

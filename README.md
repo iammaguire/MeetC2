@@ -6,6 +6,11 @@ https://user-images.githubusercontent.com/7650862/122882317-91e9b880-d32b-11eb-8
 
 Usage:
 
+The default HttpListener is instantiated with the first two command line arguments - the first being the interface to listen on and the second being the hostname.
+
+To listen on wlp2s0 with command.com being the hostname, run
+`./c2 wlp2s0 command.com`
+
 Inside the command server you can reference beacons using either their list id or their unique id.
 For example if the output of 'list' is '[0] LuTNluGL@10.255.52.1 last seen 2021-05-23 21:07:17.208101927 -0400 EDT m=+179.667762638', you could refer to this beacon by LuTNluGL or 0.
 

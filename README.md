@@ -1,4 +1,4 @@
-
+It's great to see interest in the project growing! I've spent a lot of time on this but it has been only a hobby project until now. When I finish up the certification I'm currently working on I'll be cleaning the repo up and making usage more user friendly. 
 
 https://user-images.githubusercontent.com/7650862/123324333-38011280-d526-11eb-8765-786f0fe7e1ee.mp4
 

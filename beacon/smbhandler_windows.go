@@ -112,11 +112,11 @@ func (server BeaconSmbServer) start() {
 	}
 }
 
-func (client BeaconSmbClient) queryServer()          {} // unused
-func (client BeaconSmbClient) upload(string)         {}
-func (client BeaconSmbClient) download(string)       {}
-func (client BeaconSmbClient) addProxyClient(Beacon) {}
-func (client BeaconSmbClient) exitHandler()          {}
+func (client BeaconSmbClient) queryServer()           {} // unused
+func (client BeaconSmbClient) upload(string)          {}
+func (client BeaconSmbClient) download(string) string { return "" }
+func (client BeaconSmbClient) addProxyClient(Beacon)  {}
+func (client BeaconSmbClient) exitHandler()           {}
 
 func (client BeaconSmbClient) sendMessage(conn net.Conn, msg string) (string, error) {
 	msgEnc := securityContext.encrypt([]byte(msg))

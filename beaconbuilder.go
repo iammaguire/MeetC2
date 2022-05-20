@@ -78,7 +78,7 @@ func createBeacon(listener int, platform string, arch string, proxyIp string) {
 	}
 
 	if proxyIp != "" && proxyIp != "n" {
-		cmm := "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + targetArch + " go build -ldflags '" + buildFlags + " -X main.pipeName=" + pipeName + " -X main.id=" + beaconId + " -X main.secret=" + string(securityContext.key) + " -X main.cmdProxyIp=" + proxyIp + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName
+		cmm := "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + targetArch + " go build -ldflags '" + buildFlags + " -X main.webPort=" + strconv.Itoa(webPort) + " -X main.pipeName=" + pipeName + " -X main.id=" + beaconId + " -X main.secret=" + string(securityContext.key) + " -X main.cmdProxyIp=" + proxyIp + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName
 		fmt.Println(cmm)
 		cmdHandle = exec.Command("/bin/sh", "-c", cmm)
 	} else if input == "y" {
@@ -100,10 +100,10 @@ func createBeacon(listener int, platform string, arch string, proxyIp string) {
 
 		notifyBeaconOfProxyUpdate(beacon, beaconId)
 		info("Using beacon " + beacon.Id + "@" + beacon.Ip + " as proxy.")
-		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS="+target+" GOARCH="+targetArch+" go build -ldflags '"+buildFlags+" -X main.pipeName="+pipeName+" -X main.id="+beaconId+" -X main.secret="+string(securityContext.key)+" -X main.cmdProxyId="+beacon.Id+" -X main.cmdProxyIp="+beacon.Ip+" -X main.cmdAddress="+ip+" -X main.cmdPort="+port+" -X main.cmdHost=command.com' -o ../out/"+beaconName)
+		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS="+target+" GOARCH="+targetArch+" go build -ldflags '"+buildFlags+" -X main.webPort="+strconv.Itoa(webPort)+" -X main.pipeName="+pipeName+" -X main.id="+beaconId+" -X main.secret="+string(securityContext.key)+" -X main.cmdProxyId="+beacon.Id+" -X main.cmdProxyIp="+beacon.Ip+" -X main.cmdAddress="+ip+" -X main.cmdPort="+port+" -X main.cmdHost=command.com' -o ../out/"+beaconName)
 	} else {
 		info("No proxy")
-		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS="+target+" GOARCH="+targetArch+" go build -ldflags '"+buildFlags+" -X main.pipeName="+pipeName+" -X main.id="+beaconId+" -X main.secret="+string(securityContext.key)+" -X main.cmdAddress="+ip+" -X main.cmdPort="+port+" -X main.cmdHost=command.com' -o ../out/"+beaconName)
+		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS="+target+" GOARCH="+targetArch+" go build -ldflags '"+buildFlags+" -X main.webPort="+strconv.Itoa(webPort)+" -X main.pipeName="+pipeName+" -X main.id="+beaconId+" -X main.secret="+string(securityContext.key)+" -X main.cmdAddress="+ip+" -X main.cmdPort="+port+" -X main.cmdHost=command.com' -o ../out/"+beaconName)
 	}
 
 	stderr, err := cmdHandle.StderrPipe()

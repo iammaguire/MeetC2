@@ -61,6 +61,10 @@ func (server WebInterface) startListener() error {
 	staticFileHandler := http.StripPrefix("/c2/", http.FileServer(staticFileDirectory))
 	router.PathPrefix("/c2/").Handler(staticFileHandler).Methods("GET")
 
+	staticFileDirectoryOut := http.Dir("./out/")
+	staticFileHandlerOut := http.StripPrefix("/dl/", http.FileServer(staticFileDirectoryOut))
+	router.PathPrefix("/dl/").Handler(staticFileHandlerOut).Methods("GET")
+
 	srv := &http.Server{
 		Handler:      router,
 		Addr:         server.ip + ":" + strconv.Itoa(server.port),

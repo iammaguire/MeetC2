@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -37,7 +38,12 @@ type HttpListener struct {
 
 func (server HttpListener) startListener() error {
 	var router = mux.NewRouter()
-	var ifaceIp = getIfaceIp(server.Iface)
+	var ifaceIp = server.Iface
+
+	if !regexp.MustCompile(`(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`).MatchString(*&server.Iface) {
+		getIfaceIp(server.Iface)
+	}
+
 	router.HandleFunc("/{data}", server.beaconPostHandler).Host(server.Hostname).Methods("Post")
 	router.HandleFunc("/{data}", server.beaconGetHandler).Host(server.Hostname).Methods("Get")
 	router.HandleFunc("/d/{data}", server.beaconUploadHandler).Host(server.Hostname).Methods("Get")
@@ -51,6 +57,7 @@ func (server HttpListener) startListener() error {
 
 	go func() {
 		log.Fatal(srv.ListenAndServe())
+		fmt.Println("HTTPListener killed")
 	}()
 
 	return nil
@@ -266,7 +273,7 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	messageData, _ := json.Marshal(beaconMessages)
-	fmt.Println(string(messageData))
+	//fmt.Println(string(messageData))
 	//messageEnc := securityContext.encrypt([]byte(messageData))
 	beaconMsg := b64.StdEncoding.EncodeToString(messageData) //(messageEnc)
 

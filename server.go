@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -78,6 +79,10 @@ var cmdArgs = map[string]string{
 }
 
 func getIfaceIp(iface string) string {
+	if regexp.MustCompile(`(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`).MatchString(iface) { // if already valid IP address, dont try to resolve
+		return iface
+	}
+
 	ief, _ := net.InterfaceByName(iface)
 	addrs, _ := ief.Addrs()
 	return strings.Split(addrs[0].String(), "/")[0]
@@ -610,15 +615,16 @@ func loadModules() {
 }
 
 func main() {
-	var iface = flag.String("i", "wlp2s0", "Interface to listen on")
+	var iface = flag.String("i", "127.0.0.1", "IP to listen on")
 	var domain = flag.String("d", "command.com", "Domain name for C2 server")
-	var port = flag.Int("p", 8000, "Port for web interface")
+	var port = flag.Int("p", 8001, "Port for web interface")
 
 	flag.Parse()
 
 	securityContext = newSecurityContext()
 
 	var WebInterface = WebInterface{
+		ip:   *iface,
 		port: *port,
 	}
 

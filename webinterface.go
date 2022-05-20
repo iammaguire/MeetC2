@@ -25,6 +25,7 @@ type IWebInterface interface {
 }
 
 type WebInterface struct {
+	ip   string
 	port int
 }
 
@@ -62,16 +63,17 @@ func (server WebInterface) startListener() error {
 
 	srv := &http.Server{
 		Handler:      router,
-		Addr:         "127.0.0.1:" + strconv.Itoa(server.port),
+		Addr:         server.ip + ":" + strconv.Itoa(server.port),
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
 
 	go func() {
 		log.Fatal(srv.ListenAndServe())
+		fmt.Println("Web interface killed")
 	}()
 
-	fmt.Println("Web interface listening on port " + strconv.Itoa(server.port))
+	fmt.Println("Web interface listening on " + server.ip + ":" + strconv.Itoa(server.port))
 
 	return nil
 }

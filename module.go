@@ -1,11 +1,11 @@
 package main
 
 import (
-	"os"
-	"fmt"
 	"bufio"
-	"os/exec"
+	"fmt"
 	"io/ioutil"
+	"os"
+	"os/exec"
 )
 
 type IModule interface {
@@ -19,9 +19,9 @@ type IModule interface {
 }
 
 type Module struct {
-	Name string  
-	Source string
-	Language string
+	Name      string
+	Source    string
+	Language  string
 	extension string
 }
 
@@ -34,7 +34,7 @@ func newModule(name string, source string, language string) *Module {
 		extension = ".cs"
 	}
 
-	return &Module { name, source, language, extension }
+	return &Module{name, source, language, extension}
 }
 
 func (mod Module) getShellcode() []byte {
@@ -47,7 +47,7 @@ func (mod Module) getShellcode() []byte {
 	}
 
 	output := ""
-	cmdHandle := exec.Command("/bin/sh", "-c", "./includes/donut -x 1 -c TestModule2 -m Main " + fileName + " -o " + shellcodeFileName)
+	cmdHandle := exec.Command("/bin/sh", "-c", "./includes/donut -x 1 -c TestModule2 -m Main "+fileName+" -o "+shellcodeFileName)
 	stdout, err := cmdHandle.StdoutPipe()
 	stderr, err := cmdHandle.StderrPipe()
 
@@ -57,7 +57,7 @@ func (mod Module) getShellcode() []byte {
 			output += scanner.Text()
 			output += "\n"
 		}
-		
+
 		scanner = bufio.NewScanner(stderr)
 		for scanner.Scan() {
 			output += scanner.Text()
@@ -80,7 +80,7 @@ func (mod Module) getShellcode() []byte {
 }
 
 func (mod Module) writeToDisk() {
-	ioutil.WriteFile("modules/" + mod.Name + mod.extension, []byte(mod.Source), 0644)
+	ioutil.WriteFile("modules/"+mod.Name+mod.extension, []byte(mod.Source), 0644)
 }
 
 func (mod Module) setSource(source string) {
@@ -89,7 +89,7 @@ func (mod Module) setSource(source string) {
 
 func (mod Module) getSourceFromDisk() string {
 	source, err := ioutil.ReadFile("modules/" + mod.Name + mod.extension)
-	
+
 	if err != nil {
 		return ""
 	} else {
@@ -99,7 +99,7 @@ func (mod Module) getSourceFromDisk() string {
 }
 
 func (mod Module) getLanguage() string {
-	return "C#"
+	return mod.Language
 }
 
 func (mod Module) getName() string {
@@ -110,24 +110,24 @@ func (mod Module) compile(delete bool) (string, error) {
 	var cmdHandle *exec.Cmd
 	filename := "/tmp/" + genRandID()
 	outfile := "modules/" + mod.Name + ".exe"
-    err := ioutil.WriteFile(filename, []byte(mod.Source), 0644)
+	err := ioutil.WriteFile(filename, []byte(mod.Source), 0644)
 
 	fmt.Println(mod.Language)
 
 	if mod.Language == "C#" {
-		cmdHandle = exec.Command("/bin/sh", "-c", "mcs -out:" + outfile + " " + filename)
+		cmdHandle = exec.Command("/bin/sh", "-c", "mcs -out:"+outfile+" "+filename)
 	} else if mod.Language == "Go" {
-		cmdHandle = exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags '-s -w' -o " + outfile + " modules/" + mod.Name + ".go")
+		cmdHandle = exec.Command("/bin/sh", "-c", "env CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags '-s -w' -o "+outfile+" modules/"+mod.Name+".go")
 	}
 
 	stderr, err := cmdHandle.StderrPipe()
 	stdout, err := cmdHandle.StdoutPipe()
-	
+
 	output := ""
 
 	if err = cmdHandle.Start(); err == nil {
 		scanner := bufio.NewScanner(stderr)
-		
+
 		if err != nil {
 			output += scanner.Text()
 			output += "\n"
@@ -139,7 +139,7 @@ func (mod Module) compile(delete bool) (string, error) {
 		}
 
 		scanner = bufio.NewScanner(stdout)
-		
+
 		if err != nil {
 			output += scanner.Text()
 			output += "\n"
@@ -156,10 +156,10 @@ func (mod Module) compile(delete bool) (string, error) {
 	if delete {
 		os.Remove(outfile)
 	}
-	
+
 	if len(output) == 0 {
 		return outfile, nil
 	} else {
 		return outfile, fmt.Errorf("%s", output)
 	}
-} 
+}

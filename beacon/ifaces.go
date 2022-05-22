@@ -1,25 +1,25 @@
-package main 	
+package main
 
-const BYTES = 0;
-const STRING = 1;
+const BYTES = 0
+const STRING = 1
 
 type EncType interface {
-    scramble() []byte
+	scramble() []byte
 }
 
 type Request interface {
 	queryServer()
-    upload(string)
-    download(string)
-    addProxyClient(Beacon)
-    exitHandler()
+	upload(string)
+	download(string) string
+	addProxyClient(Beacon)
+	exitHandler()
 }
 
 type CommType interface {
-    EncType
+	EncType
 	Request
 }
 
 type IShellcodeInjector interface {
-    inject() error
+	inject() error
 }

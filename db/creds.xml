@@ -1,0 +1,20 @@
+<CredentialDB>
+  <credentials>
+    <user>meet</user>
+    <password>password123</password>
+    <passwordType>raw</passwordType>
+    <domain>test.local</domain>
+  </credentials>
+  <credentials>
+    <user>meedsads</user>
+    <password>asd</password>
+    <passwordType>ntml</passwordType>
+    <domain>test.local</domain>
+  </credentials>
+  <credentials>
+    <user>meet</user>
+    <password>password124</password>
+    <passwordType>raw</passwordType>
+    <domain>test.local</domain>
+  </credentials>
+</CredentialDB>

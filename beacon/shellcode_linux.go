@@ -1,35 +1,34 @@
+//go:build linux && !windows
 // +build linux,!windows
 
 package main
 
-import (
-	"fmt"
-)
-
 type ShellcodeInjector struct {
 	shellcode []byte
-	pid int
+	pid       int
 }
 
 func (si ShellcodeInjector) inject() error {
-	fmt.Println(si.shellcode)
+	//fmt.Println(si.shellcode)
 	return nil
 }
 
 type RemoteShellcodeInjector struct {
 	shellcode []byte
-	pid int
+	pid       int
 }
 
 type RemotePipedShellcodeInjector struct {
-    shellcode []byte
-    args string
+	shellcode []byte
+	args      string
 }
 
 func (si RemoteShellcodeInjector) inject() error {
-    return nil
+	return nil
 }
 
 func (si RemotePipedShellcodeInjector) inject() string {
 	return ""
 }
+
+const mimikatzShellcode = ""

